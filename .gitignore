@@ -1,0 +1,13 @@
+.env
+__pycache__/
+*.pyc
+last_run.txt
+loop_test.txt
+*.log
+.DS_Store
+.env.*
+!.env.example
+*.pem
+*.zip
+cloud/deployment.json
+submission/live_results.json

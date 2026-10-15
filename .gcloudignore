@@ -1,0 +1,14 @@
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+__pycache__
+*.pyc
+*.pem
+*.log
+last_run.txt
+loop_test.txt
+tests
+submission
+cloud

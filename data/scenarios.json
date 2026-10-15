@@ -1,0 +1,35 @@
+[
+  {
+    "asset": { "id": "MTR-07", "type": "electric motor / VFD", "criticality": "high" },
+    "event_codes": ["TEMP-RISE", "FAN-SLOW"],
+    "post_action_metrics": {"winding_temp_c": 71, "vibration_mm_s": 2.0, "current_a": 42},
+    "metrics": {
+      "winding_temp_c": { "unit": "C", "baseline": [68,70,69,71,70,69,72,70,71,69,70,71], "latest": 94 },
+      "vibration_mm_s": { "unit": "mm/s", "baseline": [1.9,2.0,2.1,1.8,2.0,2.0,1.9,2.1,2.0,1.9,2.0,2.0], "latest": 2.3 },
+      "current_a": { "unit": "A", "baseline": [41,42,40,43,41,42,41,42,40,41,42,41], "latest": 44 }
+    }
+  },
+  {
+    "asset": { "id": "PMP-03", "type": "coolant pump", "criticality": "high" },
+    "event_codes": ["VIB-HI", "BRG-WEAR"],
+    "metrics": {
+      "vibration_mm_s": { "unit": "mm/s", "baseline": [2.0,2.1,1.9,2.0,2.1,2.0,1.9,2.0,2.1,2.0,1.9,2.0], "latest": 9.4 },
+      "bearing_temp_c": { "unit": "C", "baseline": [55,56,54,55,57,55,56,54,55,56,55,54], "latest": 71 }
+    }
+  },
+  {
+    "asset": { "id": "SWG-02", "type": "switchgear feeder", "criticality": "medium" },
+    "event_codes": ["OC-TRIP"],
+    "post_action_metrics": {"current_a": 98},
+    "metrics": {
+      "current_a": { "unit": "A", "baseline": [95,98,96,97,99,96,98,97,96,98,97,96], "latest": 141 }
+    }
+  },
+  {
+    "asset": { "id": "PRESS-01", "type": "hydraulic press", "criticality": "critical" },
+    "event_codes": ["PRS-LOW"],
+    "metrics": {
+      "hydraulic_pressure_bar": { "unit": "bar", "baseline": [210,212,209,211,210,213,209,210,211,212,210,209], "latest": 128 }
+    }
+  }
+]

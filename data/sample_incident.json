@@ -1,0 +1,25 @@
+{
+  "asset": {
+    "id": "MTR-07",
+    "type": "electric motor / VFD",
+    "criticality": "high"
+  },
+  "event_codes": ["TEMP-RISE", "FAN-SLOW"],
+  "metrics": {
+    "winding_temp_c": {
+      "unit": "C",
+      "baseline": [68, 70, 69, 71, 70, 69, 72, 70, 71, 69, 70, 71],
+      "latest": 94
+    },
+    "vibration_mm_s": {
+      "unit": "mm/s",
+      "baseline": [1.9, 2.0, 2.1, 1.8, 2.0, 2.0, 1.9, 2.1, 2.0, 1.9, 2.0, 2.0],
+      "latest": 2.3
+    },
+    "current_a": {
+      "unit": "A",
+      "baseline": [41, 42, 40, 43, 41, 42, 41, 42, 40, 41, 42, 41],
+      "latest": 44
+    }
+  }
+}

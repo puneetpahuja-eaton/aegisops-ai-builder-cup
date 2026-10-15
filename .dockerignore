@@ -1,0 +1,16 @@
+.env
+__pycache__/
+*.pyc
+last_run.txt
+loop_test.txt
+.git
+.gitignore
+docs/
+.env.*
+!.env.example
+tests/
+submission/
+cloud/
+*.pem
+*.zip
+*.pdf
