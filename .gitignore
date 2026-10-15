@@ -11,3 +11,6 @@ loop_test.txt
 *.zip
 cloud/deployment.json
 submission/live_results.json
+submission/media/
+submission/AegisOps-Demo-Draft.mp4
+submission/node_modules/

@@ -40,6 +40,15 @@ class DashboardTests(unittest.TestCase):
         self.assertEqual(len(app.exception), 0)
         self.assertEqual(len(app.session_state["cases"]), 4)
 
+    def test_audit_history_persists_across_reruns(self):
+        with patch.dict(os.environ, {"BQ_DATASET": "audit"}), patch("bq.recent_history", return_value=[{"asset_id": "MTR-07"}]):
+            app = AppTest.from_file(str(APP)).run()
+            next(button for button in app.button if button.label == "Refresh audit history").click().run()
+            self.assertEqual(len(app.exception), 0)
+            self.assertEqual(app.session_state["audit_history"][0]["asset_id"], "MTR-07")
+            app.run()
+            self.assertEqual(len(app.dataframe), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

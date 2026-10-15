@@ -17,7 +17,7 @@ from orchestrator import approve_simulation, load_scenarios, load_sop, run_case
 
 st.set_page_config(page_title="AegisOps | Industrial reliability", page_icon="⚙️", layout="wide")
 logging.basicConfig(level=logging.INFO)
-CLOUD_ERRORS = (GoogleAPICallError, GoogleAuthError, RuntimeError, ValueError)
+CLOUD_ERRORS = (GoogleAPICallError, GoogleAuthError, RuntimeError, ValueError, TimeoutError)
 
 
 def persist(case: dict) -> None:
@@ -45,6 +45,17 @@ def render_case(case: dict) -> None:
     st.caption(f"Source: {diagnosis['_source']} | Mode: {case['mode']} | Case: {case['case_id']}")
     for error in case["errors"]:
         st.error(error)
+    if case["errors"] and st.button("Retry this incident", key=f"retry-{case['case_id']}"):
+        with st.spinner(f"Retrying {evidence['asset_id']}..."):
+            replacement = run_case(
+                case["incident"], load_sop(),
+                offline=case["mode"] == "offline simulation",
+            )
+        st.session_state["cases"] = [
+            replacement if item["case_id"] == case["case_id"] else item
+            for item in st.session_state["cases"]
+        ]
+        st.rerun()
     with st.expander("1. Monitor | deterministic telemetry evidence"):
         st.write("Event codes:", evidence["event_codes"])
         st.dataframe(evidence["signals"], hide_index=True, width="stretch")
@@ -153,12 +164,16 @@ def main() -> None:
     with st.expander("Reference playbook"):
         st.markdown(sop)
     if bq.is_enabled():
-        with st.expander("Operational audit history | BigQuery"):
+        with st.expander("Operational audit history | BigQuery", expanded="audit_history" in st.session_state):
             if st.button("Refresh audit history"):
                 try:
-                    st.dataframe(bq.recent_history(), hide_index=True, width="stretch")
+                    st.session_state["audit_history"] = bq.recent_history()
                 except CLOUD_ERRORS as error:
                     st.error(f"History query failed: {error}")
+                else:
+                    st.rerun()
+            if "audit_history" in st.session_state:
+                st.dataframe(st.session_state["audit_history"], hide_index=True, width="stretch")
     st.caption("Cloud-enabled architecture: Cloud Run + Gemini on Vertex AI + Cloud Storage + BigQuery. Active backends are shown in the sidebar.")
 
 

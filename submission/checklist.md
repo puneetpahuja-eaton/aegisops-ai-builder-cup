@@ -2,13 +2,22 @@
 
 ## Technical artifacts
 
-- [ ] Public Cloud Run URL responds and completes a live Gemini workflow.
-- [ ] Public, standalone GitHub repository is readable without sign-in.
-- [ ] Repository contains no keys, tokens, employer data or unrelated projects.
-- [ ] Six-slide PDF includes problem, architecture, prototype, honest validation,
+- [x] Public Cloud Run URL responds and completes a live Gemini workflow.
+- [x] Public, standalone GitHub repository is readable without sign-in.
+- [x] Repository excludes keys, tokens, employer data and unrelated projects; recognized secret-pattern scan passed.
+- [x] Six-slide PDF includes problem, architecture, prototype, honest validation,
       limitations, impact and feasibility.
 - [ ] Public video is strictly under three minutes.
-- [ ] All materials are in English.
+- [x] Local narrated demo draft generated and duration verified: 165 seconds.
+- [x] All materials are in English.
+
+Live URL: https://aegis-ops-498775210896.asia-south1.run.app
+
+Source: https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
+
+PDF: `AegisOps-Proposal.pdf`
+
+Video draft: `AegisOps-Demo-Draft.mp4` (local, not yet uploaded to an accepted host).
 
 ## Participant tasks
 
@@ -18,6 +27,7 @@
       Creating a new repository alone does not establish eligibility.
 - [ ] Review organizer terms, IP/licensing and employment restrictions.
 - [ ] Review cloud billing/credits and configure budget alerts.
+      Automation received HTTP 403; the billing-account owner must create the alert.
 - [ ] Have a qualified engineer review the fictional SOP and safety framing.
 - [ ] Upload the final video and verify access in an incognito window.
 - [ ] Submit the Manufacturing category by October 18, 2026, 6 p.m. IST.

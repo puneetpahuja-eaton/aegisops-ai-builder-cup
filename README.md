@@ -137,8 +137,18 @@ Do not expose this prototype as an unrestricted production control system.
 
 See `submission/` for a six-slide proposal, generated PDF, three-minute-video
 script, checklist, and reproducible rendering source.
+The local narrated draft is `submission/AegisOps-Demo-Draft.mp4` (165 seconds).
+It is an explicitly labeled edited screen sequence from real cloud runs, with
+synthetic data and Windows-generated narration. Raw full-motion browser recordings
+are in the local `submission/media/` folder. Review the draft before uploading;
+recording your own narration and emphasizing the human decision improves the pitch.
+Media is excluded from Git; the PDF and reproduction scripts are public.
 The submission deadline used for planning is October 18, 2026 at 6 p.m. IST,
 with an internal target of 3 p.m.
+
+`submission/verification.md` records test evidence and limitations.
+An attempt to create a billing budget was denied; no alert exists from this setup.
+Have the billing-account owner configure a project-scoped budget in the console.
 
 ## Roadmap (not implemented)
 
