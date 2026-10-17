@@ -42,11 +42,21 @@ def answer(device_id: str, query: str, *, screen_context: str = "", role: str = 
 
     context = _format_context(chunks)
     if not is_live():
-        # Honest offline behavior: return the most relevant grounded extract, not a synthesized answer.
-        top = chunks[0]
-        extract = top.get("text", "")[:700]
-        return {"answer": f"(Offline retrieval — not Google AI) Most relevant passage from "
-                f"'{top.get('source_name')}':\n\n{extract}", "citations": [top.get("source_name", "source")],
+        # Honest offline behavior: return the most relevant grounded extracts from
+        # distinct sources (no LLM synthesis available).
+        seen: set[str] = set()
+        parts = []
+        for chunk in chunks:
+            source = chunk.get("source_name", "source")
+            if source in seen:
+                continue
+            seen.add(source)
+            parts.append(f"From '{source}':\n{chunk.get('text', '')[:400].strip()}")
+            if len(parts) >= 3:
+                break
+        body = "\n\n".join(parts)
+        return {"answer": f"(Offline retrieval — not Google AI. Configure Vertex AI for synthesized "
+                f"answers.) Most relevant passages:\n\n{body}", "citations": sorted(seen),
                 "sources": source_names, "backend": "offline-retrieval", "grounded": True}
 
     screen = f"\n\nCurrent screen context (for reference only):\n{screen_context}" if screen_context else ""

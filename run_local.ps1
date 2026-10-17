@@ -9,8 +9,11 @@ $env:FORCE_MOCK = '0'
 $env:GOOGLE_CLOUD_PROJECT = 'project-fd312a16-8445-4b1f-862'
 $env:GOOGLE_CLOUD_LOCATION = 'global'
 $env:GEMINI_MODEL = 'gemini-2.5-flash'
+$env:EMBED_MODEL = 'text-embedding-004'
 $env:GCS_BUCKET = 'aegisops-498775210896-demo'
 $env:BQ_DATASET = 'aegisops_audit'
 Set-Location $PSScriptRoot
-Write-Output 'Starting local cloud-backed demo. The short-lived token expires in about one hour; restart this script to renew it.'
-& $Python -m streamlit run app.py --server.port=8502 --browser.gatherUsageStats=false
+Write-Output 'Starting local cloud-backed demo on http://localhost:8506 (real Vertex AI + Gemini).'
+Write-Output 'The short-lived token expires in about one hour; restart this script to renew it.'
+Write-Output 'After it starts, open Integrations and click "Re-ingest all" so knowledge is re-embedded with Vertex AI.'
+& $Python -m streamlit run app.py --server.port=8506 --server.headless=true --browser.gatherUsageStats=false
