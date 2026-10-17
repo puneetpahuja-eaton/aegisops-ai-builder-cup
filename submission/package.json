@@ -2,7 +2,9 @@
   "name": "aegisops-demo-capture",
   "private": true,
   "scripts": {
-    "capture": "node capture-demo.mjs"
+    "capture": "node capture-demo.mjs",
+    "verify:local": "node verify-prism.mjs",
+    "verify:cloud": "node verify-prism.mjs --live"
   },
   "devDependencies": {
     "playwright": "^1.56.0"

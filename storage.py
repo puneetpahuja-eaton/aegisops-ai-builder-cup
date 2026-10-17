@@ -39,3 +39,11 @@ def load_text(name: str) -> str:
 
 def load_json(name: str):
     return json.loads(load_text(name))
+
+
+def load_prism_text(name: str) -> str:
+    if name not in {"assets.csv", "live_scenarios.json"}:
+        raise ValueError("Unsupported PRISM data file.")
+    if os.getenv("GCS_BUCKET"):
+        return _gcs_text(f"prism/{name}")
+    return (Path(__file__).parent / "prism_reference" / "data" / name).read_text(encoding="utf-8")

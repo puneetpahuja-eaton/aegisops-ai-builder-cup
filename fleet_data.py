@@ -22,6 +22,9 @@ FAULT_CODES = PROPAGATING_CODES | {
 
 
 class FleetAsset(Asset):
+    name: str = Field(default="", max_length=200)
+    site: str = Field(default="", max_length=120)
+    rated_kw: float = Field(default=1, gt=0, le=1_000_000)
     parent_id: str | None = None
     downtime_cost_per_minute: float = Field(default=50, ge=0, le=1_000_000)
     assumed_manual_mttr_minutes: float = Field(default=60, gt=0, le=100_000)
@@ -124,7 +127,8 @@ def load_csv(text: str) -> FleetDataset:
         raise ValueError("CSV column names must be unique.")
     if not required.issubset(columns):
         raise ValueError(f"CSV requires columns: {', '.join(sorted(required))}.")
-    features = [column for column in columns if column not in required]
+    optional_metadata = {"name", "site", "rated_kw"}
+    features = [column for column in columns if column not in required | optional_metadata]
     if not features:
         raise ValueError("CSV needs at least one numeric metric column.")
     assets, history, telemetry = {}, [], []
@@ -134,6 +138,9 @@ def load_csv(text: str) -> FleetDataset:
                 raise ValueError("Row has a different number of values than the header.")
             asset = {"id": row["asset_id"], "type": row["asset_type"],
                      "criticality": row["criticality"], "parent_id": row["parent_id"] or None}
+            asset.update({key: row[key] for key in ("name", "site") if key in row})
+            if "rated_kw" in row:
+                asset["rated_kw"] = float(row["rated_kw"])
             if asset["id"] in assets and asset != assets[asset["id"]]:
                 raise ValueError("Asset metadata changed between rows.")
             assets[asset["id"]] = asset
@@ -190,7 +197,7 @@ def demo_dataset() -> FleetDataset:
 def csv_template(data: FleetDataset) -> str:
     buffer = io.StringIO()
     features = sorted({key for row in data.history + data.telemetry for key in row.metrics})
-    fields = ["timestamp", "asset_id", "phase", "asset_type", "criticality", "parent_id", "event_codes", *features]
+    fields = ["timestamp", "asset_id", "phase", "asset_type", "criticality", "parent_id", "name", "site", "rated_kw", "event_codes", *features]
     writer = csv.DictWriter(buffer, fieldnames=fields)
     writer.writeheader()
     assets = {asset.id: asset for asset in data.assets}
@@ -199,5 +206,6 @@ def csv_template(data: FleetDataset) -> str:
             asset = assets[row.asset_id]
             writer.writerow({"timestamp": row.timestamp.isoformat(), "asset_id": row.asset_id, "phase": phase,
                              "asset_type": asset.type, "criticality": asset.criticality,
-                             "parent_id": asset.parent_id or "", "event_codes": "|".join(row.event_codes), **row.metrics})
+                             "parent_id": asset.parent_id or "", "name": asset.name, "site": asset.site,
+                             "rated_kw": asset.rated_kw, "event_codes": "|".join(row.event_codes), **row.metrics})
     return buffer.getvalue()

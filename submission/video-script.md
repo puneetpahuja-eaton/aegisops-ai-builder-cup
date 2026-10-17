@@ -1,75 +1,74 @@
-# AegisOps demo script | Target 2 minutes 45 seconds
+# PRISM Google Cloud edition | Target 2 minutes 45 seconds
 
-Use the actual deployed application in live Vertex AI mode. Do not label offline
-results as Gemini. Pre-run or pause the fleet before recording to avoid spending the
-three-minute limit watching API latency; label any cuts transparently.
-Do not edit footage to imply actions happened that did not happen.
+Use the actual deployed PRISM interface. Show accepted Google AI source labels;
+never label offline rules as Gemini. Any edited waits must be transparent.
+The older 165-second video draft shows a superseded interface.
 
 ## 0:00-0:20 | Problem
 
-"A plant alarm tells you what changed, not what to review next. AegisOps turns
-operational telemetry into a cited incident hypothesis and engineer handoff.
-This demonstration uses synthetic data and never controls real equipment."
+"One upstream power issue can produce an alarm storm across a manufacturing
+plant. PRISM groups those symptoms, identifies an evidence-backed hypothesis,
+and produces a reviewable operational handoff."
 
-Show the title and the Cloud Run address.
+Show the Cloud Run URL and original Live Operations tab.
 
-## 0:20-0:40 | Cloud implementation
+## 0:20-0:40 | Models and cloud
 
-"The application runs on Cloud Run. Gemini on Vertex AI reasons over evidence
-and SOPs from private Cloud Storage. BigQuery retains the audit trail."
+"This is the original 22-asset PRISM workflow, with three days of healthy
+history, trained anomaly detection and Markov event patterns. Cloud Run hosts it;
+Vertex AI adds SOP-grounded reasoning, private Cloud Storage supplies the inputs,
+and BigQuery stores case-summary revisions."
 
-Show the reasoning backend, document source and history configuration.
+Show Trained models and Google Cloud & data source.
 
-## 0:40-1:20 | Fleet evidence, topology and replacement
+## 0:40-1:15 | One cause, many symptoms
 
-"The numerical evidence is deterministic. Gemini provides the hypothesis and
-these source citations; the application validates each quote. Confidence here
-is the model's own report, not a proven failure probability."
+Pause around the first voltage-sag case (sample index 12). Show the fleet table,
+model evidence, topology, agent trace and named tool calls.
 
-Load the small synthetic fleet and process two timestamps. Show FEEDER-01 as
-an upstream candidate with MTR-07/PMP-03 correlated symptoms, plus the actual
-accepted Gemini source. Show timestamped tool events and the topology tab.
-Briefly open the CSV/JSON replacement templates and explain that a validated
-upload replaces the entire sample fleet, history and trained models.
-If Gemini escalates conservatively, show that honestly rather than invent approval.
+"These numerical model results and topology correlations are deterministic.
+Gemini adds this hypothesis and validated SOP citations. Neither topology
+nor a model's self-confidence proves a physical root cause."
 
-## 1:20-1:45 | Human approval and verification
+Show the actual accepted Gemini source in Cases.
 
-"Eligible sandbox scenarios still require named human approval. After approval,
-the verifier evaluates later snapshots. It needs two healthy ticks within three.
-Synthetic recovery is not a real repair; approval never changes uploaded measurements."
+## 1:15-1:40 | Original automatic simulator loop
 
-Enter a demo reviewer alias, approve an eligible fleet case, then step two later
-timestamps and show verification.
-If no live case is eligible, demonstrate escalation instead and explain the
-approval mechanism separately without pretending it occurred.
+"The original confidence and reversibility policy is preserved. Automatic
+actions here change only the synthetic simulator. The next sample is scored
+again by the verifier. No real equipment command is sent."
 
-## 1:45-2:15 | Engineer escalation
+Show an actual AUTO_REMEDIATE -> ACTING -> RESOLVED case. If an API failure or
+insufficient grounding caused escalation, explain it; never fabricate success.
 
-"The pump has a bearing-risk code, so the independent gate requires engineer
-review. Gemini drafts a structured, review-only work order grounded in the SOP.
-Nothing is dispatched or repaired automatically."
+## 1:40-2:00 | Human escalation and value
 
-Continue to timestamp five for the independent PMP-03 bearing indication.
-Show why it stays separate from the supply event, its escalation and work-order draft.
+Show the battery-risk case and review-only work-order draft, then Counterfactual.
 
-## 2:15-2:35 | Audit and failure behavior
+"Physical or uncertain interventions are handed to an engineer. These original
+downtime and cost fields compare synthetic scenarios with assumed manual MTTR.
+They are not measured savings or evidence of a production repair."
 
-"The audit preserves the model source, decision, approval and verification.
-API failures are explicit; the app never substitutes offline rules as Gemini."
+## 2:00-2:25 | Replace the sample data
 
-Save the case summaries to BigQuery and download the full fleet audit JSON.
-Show the power-demo option: 22 assets, three healthy training days and six
-fault scenarios, with no claim of production accuracy.
+Open Models & Data -> Replace telemetry. Show original metadata fields,
+CSV/JSON templates and an authorized synthetic upload.
 
-## 2:35-2:45 | Closing
+"Uploading replaces the entire sample fleet and history, not just a selected
+incident. Uploaded measurements remain observation-only: no automated control,
+no rewritten readings, no fabricated ground truth or savings."
 
-"Our next step is an engineer-validated pilot measuring triage time and handoff
-quality. AegisOps gives manufacturing teams evidence to action, with humans in control."
+## 2:25-2:45 | Audit and close
 
-## Recording checklist
+Show a successful BigQuery save and download the full PRISM audit.
 
-- Use no personal information, secrets, account tokens or employer data on screen.
-- Ensure the final duration is strictly under 3:00; aim for 2:45-2:55.
-- Verify video access in an incognito window after upload.
-- Any editing should be transparent, with no fabricated outcomes or metrics.
+"The original UI and case behavior are regression-tested against PRISM across
+all 96 simulation steps. The next step is a qualified-engineer pilot with
+approved site procedures, measuring triage time and handoff quality."
+
+## Before upload
+
+- Duration strictly under 3:00; aim for 2:45-2:55.
+- Do not show tokens, personal information or employer data.
+- Do not confuse synthetic ground-truth coverage with production accuracy.
+- Test the uploaded video's public access in an incognito window.

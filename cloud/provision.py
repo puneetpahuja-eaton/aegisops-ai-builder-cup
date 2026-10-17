@@ -69,6 +69,8 @@ def main() -> None:
     bucket.set_iam_policy(policy)
     for name in ("sop.md", "scenarios.json", "sample_incident.json"):
         bucket.blob(name).upload_from_filename(str(ROOT / "data" / name))
+    for name in ("assets.csv", "live_scenarios.json"):
+        bucket.blob(f"prism/{name}").upload_from_filename(str(ROOT / "prism_reference" / "data" / name))
     print("Private Cloud Storage bucket seeded.")
     query_client = bigquery.Client(project=PROJECT, credentials=auth)
     dataset = bigquery.Dataset(f"{PROJECT}.{DATASET}")

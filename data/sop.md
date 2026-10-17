@@ -62,6 +62,8 @@ fully synthetic restored-metric scenario. No real filter or setpoint control is 
 
 ## SOP-109 Load and breaker indications
 Elevated load_pct, current_a or OVERLOAD_ALARM can support an overload hypothesis.
+LOAD_HIGH is an early load warning, not proof of overload; evaluate it with the
+metric history and later code transitions before claiming equipment damage.
 A noncritical asset may have a reviewed, fully synthetic restored-load scenario.
 BREAKER_OPEN and downstream LOAD_LOST require assessment of the entire affected topology.
 Do not reclose a physical breaker or provide electrical switching instructions.

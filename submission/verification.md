@@ -1,6 +1,52 @@
 # Verification record | October 17, 2026
 
-## Fleet upgrade verification (latest)
+## Original PRISM / Google Cloud edition (current)
+
+- All 54 unittest/Streamlit AppTest regressions passed with Python 3.11.9,
+  including the ten exact-PRISM parity/integration tests. The final full run
+  completed in 198 seconds while browser checks were also running.
+- The default entrypoint now launches the original PRISM dashboard, not the
+  earlier redesigned AegisOps interface. All six original tabs, replay controls,
+  asset/scenario fields, case details and original five-agent engine are retained.
+- The canonical engine and synthetic inputs are byte-identical to the imported
+  source manifest. Git attributes preserve the original bytes on Linux checkout.
+  The dashboard has documented additive cloud/upload panels and truthful
+  simulator caveats; it is not claimed to be an unmodified source file.
+- Parity tests compare all 96 original snapshots and event streams, fitted model
+  state, score histories, every case field/lifecycle, topology, counterfactual
+  curves, value and original named tool calls.
+- Actual headless Chrome checks passed locally on port 8505 and on Cloud Run.
+  Both verified the six tabs, original controls, 22 original assets and a
+  full-field JSON template. The offline first supply case auto-remediated and
+  resolved using the original synthetic policy.
+- The deployed browser accepted a real `gemini:gemini-2.5-flash` explanation,
+  saved PRISM summaries to BigQuery and exercised the audit-history query.
+  Original topology/scenario configuration was loaded from private Cloud Storage.
+- Each browser replaced every asset ID with a `USER-` ID using an actual file
+  upload. The replacement reset the replay, trained replacement models and
+  produced cases only for replacement assets. Uploaded cases escalated, claimed
+  zero avoided cost and reported no diagnosis accuracy without ground truth.
+- Invalid replacement data was rejected visibly without changing the active run.
+  Neither synthetic nor uploaded paths sent equipment commands.
+- Current deployed application revision: `aegis-ops-00010-kph`.
+- Reproduce with `node submission/verify-prism.mjs` locally or add `--live`.
+  Only synthetic template data was used for cloud checks. Screenshots and
+  machine-readable results are generated under ignored `submission/media/`.
+- `npm run capture` in `submission` now records the current PRISM browser
+  workflow; it no longer targets the superseded UI. The raw recording is not a
+  final narrated or duration-edited submission video.
+
+Intentional differences from the original: additive Google Cloud/upload/audit
+panels; diagnosis accuracy is `n/a` until measurable; automatic actions are
+limited to synthetic simulator state; uploaded observations cannot be repaired
+or credited with savings; cloud failure or insufficient evidence escalates
+explicitly rather than pretending to provide a successful Google AI result.
+Exact numerical/lifecycle parity is tested in explicit offline mode.
+
+The current proposal PDF and demo script describe this PRISM edition. The old
+165-second video draft is obsolete and must be re-recorded before submission.
+
+## Earlier redesigned fleet upgrade (historical)
 
 - 44 unittest/Streamlit AppTest regressions passed with Python 3.11.9.
 - The full 22-asset synthetic power replay processed 96 timestamps after
@@ -30,9 +76,8 @@ in model context were converted to native JSON booleans at their producer;
 paused replay no longer periodically erases audit-save feedback.
 Those behaviors now have regression coverage.
 
-The current PDF and demo script describe fleet replay. The older 165-second
-video draft still shows the earlier single-incident interface and must be
-re-recorded before submitting the fleet upgrade.
+These fleet-interface checks describe the previous UI, which remains available
+only as the legacy application for comparison and regression coverage.
 
 ## Earlier single-incident checks (October 15)
 

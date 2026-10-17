@@ -104,7 +104,7 @@ def offline_diagnose(evidence: dict, sop_text: str) -> dict:
         ("SOP-108", "thd_pct" in anomalies or bool(codes & {"THD_HIGH", "WAVEFORM_DISTORT"}), "Harmonic distortion indication"),
         ("SOP-106", "voltage_v" in anomalies or bool(codes & {"VOLT_SAG", "INPUT_UNDERVOLT"}), "Upstream supply disturbance indication"),
         ("SOP-103", "current_a" in anomalies or "OC-TRIP" in codes, "Overcurrent indication"),
-        ("SOP-109", "load_pct" in anomalies or "OVERLOAD_ALARM" in codes, "Load overload indication"),
+        ("SOP-109", "load_pct" in anomalies or bool(codes & {"LOAD_HIGH", "OVERLOAD_ALARM", "OUTPUT_OVERCURRENT"}), "Load overload indication"),
         ("SOP-102", "vibration_mm_s" in anomalies, "Vibration indication"),
     ]
     preferred = {"electrical_supply": "SOP-106", "thermal": "SOP-101", "bearing": "SOP-102",

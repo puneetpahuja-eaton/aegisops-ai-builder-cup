@@ -4,3 +4,5 @@
 *.jpg binary
 *.mp4 binary
 *.wav binary
+prism_reference/prism/** -text whitespace=cr-at-eol
+prism_reference/data/** -text whitespace=cr-at-eol

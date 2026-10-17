@@ -24,10 +24,10 @@ def slides():
         accepted = sum(case["diagnosis"]["_source"].startswith("gemini:") for case in cases)
         verified = f"Recorded live smoke test: {accepted}/{len(cases)} accepted Gemini diagnoses. This is not accuracy on a labeled production dataset."
     return [
-        ("AegisOps", "Evidence to action, with humans in control", [
+        ("PRISM | Google Cloud edition", "Original fleet workflow, grounded operational assistance", [
             "Manufacturing | Intelligent Operations & Industrial Efficiency",
             "For plant supervisors and reliability engineers: turn fragmented alarms and sensor readings into a traceable incident brief.",
-            "Synthetic hackathon sandbox. No real equipment control or production savings claims.",
+            "Original 22-asset PRISM simulator and six-tab UI. No equipment control or measured production savings.",
         ]),
         ("The problem and the narrow wedge", "One upstream fault should not become twenty tickets", [
             "Fleet triage for plant equipment and its power chain, with chronological telemetry replacement.",
@@ -36,11 +36,11 @@ def slides():
             "Validate this hypothesis with an approved pilot; no invented customer or market statistics.",
         ]),
         ("A complete, reviewable workflow", "Monitor -> Diagnose -> Decide -> Act -> Verify", [
-            "Monitor: healthy-history robust-z + Isolation Forest, Markov event patterns and a live tool trace.",
-            "Diagnose: topology correlation plus Vertex AI hypotheses and validated source passages.",
-            "Decide/Act: reversibility policy, protected-asset gates, named sandbox approval or review-only handoff.",
-            "Verify: two healthy future ticks within three; recurrence reopens. Uploads are never rewritten.",
-            "22-asset power demo: six synthetic scenarios, plus replaceable CSV/JSON manufacturing telemetry.",
+            "Monitor: original history-trained robust-z + Isolation Forest and Markov event-pattern tools.",
+            "Diagnose: original topology correlation, plus Vertex AI hypotheses and validated SOP passages.",
+            "Decide/Act: original reversibility/confidence policy; automatic actions only change the simulator.",
+            "Verify: original subsequent-sample verifier and three-sample grace period. Uploaded data is observation-only.",
+            "Exact offline parity: all 96 snapshots, case fields, model outputs and counterfactuals match PRISM.",
         ]),
         ("Google Cloud architecture", "Real services, not decorative integrations", [
             "Cloud Run: deployed application, scale-to-zero, one-instance demo limit.",
@@ -53,7 +53,7 @@ def slides():
             "Regression tests exercise approval, invalid output, bad citations, missing evidence, reopened cases, storage failure and rejected audit rows.",
             verified or "Live-cloud verification is required before submission; do not claim it until recorded.",
             "Quote checks establish textual provenance, not proof of every causal claim. Model confidence is self-reported.",
-            "Assets, SOPs and post-action readings are synthetic. No production deployment or financial savings measured.",
+            "Built-in assets/SOPs are synthetic. Original value fields are assumed counterfactuals, not realized savings.",
         ]),
         ("Impact, feasibility and the next step", "Start with one approved workflow at one plant", [
             "Pilot measures: manual-vs-assisted triage time, engineer acceptance, unsupported claims and appropriate escalation.",

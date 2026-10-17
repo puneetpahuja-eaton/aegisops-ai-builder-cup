@@ -1,0 +1,53 @@
+{
+  "_comment": "Faults injected into the LIVE demo window (index = 5-minute sample within the live stream, 0..95). Each has a known ground-truth root cause so PRISM's diagnosis can be scored. All FICTITIOUS.",
+  "scenarios": [
+    {
+      "scenario_id": "S1",
+      "asset_id": "XFMR-1",
+      "fault_type": "VOLTAGE_SAG",
+      "start_sample": 12,
+      "description": "Upstream transformer T1 develops a voltage sag; every downstream asset reads low voltage - the classic 'one cause, many symptoms' event.",
+      "ground_truth_root_cause": "XFMR-1"
+    },
+    {
+      "scenario_id": "S2",
+      "asset_id": "PDU-2",
+      "fault_type": "OVERLOAD",
+      "start_sample": 24,
+      "description": "PDU P2 is driven past rated capacity by a load spike. A local fault with no upstream propagation.",
+      "ground_truth_root_cause": "PDU-2"
+    },
+    {
+      "scenario_id": "S3",
+      "asset_id": "UPS-3",
+      "fault_type": "BATTERY_DEGRADATION",
+      "start_sample": 36,
+      "description": "UPS B1 battery string degrades; state-of-charge reserve falls. Needs a physical battery replacement, so PRISM must escalate.",
+      "ground_truth_root_cause": "UPS-3"
+    },
+    {
+      "scenario_id": "S4",
+      "asset_id": "UPS-1",
+      "fault_type": "THERMAL_RUNAWAY",
+      "start_sample": 54,
+      "description": "UPS A1 power-module temperature climbs toward a trip point. Auto-remediable via cooling and load throttling.",
+      "ground_truth_root_cause": "UPS-1"
+    },
+    {
+      "scenario_id": "S5",
+      "asset_id": "PDU-1",
+      "fault_type": "HARMONIC_DISTORTION",
+      "start_sample": 66,
+      "description": "Non-linear load pushes harmonic distortion on PDU P1 above the limit. Auto-remediable via the active harmonic filter.",
+      "ground_truth_root_cause": "PDU-1"
+    },
+    {
+      "scenario_id": "S6",
+      "asset_id": "BRK-4",
+      "fault_type": "BREAKER_TRIP",
+      "start_sample": 78,
+      "description": "Breaker B4 trips on a transient, cutting power to Server Rack R4. PRISM runs a downstream fault check and performs a remote reclose.",
+      "ground_truth_root_cause": "BRK-4"
+    }
+  ]
+}
