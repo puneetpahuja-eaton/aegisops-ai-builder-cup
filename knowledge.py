@@ -117,12 +117,20 @@ def add_or_refresh(device_id: str, kind: str, ref: str, branch: str | None = Non
     return result
 
 
-def reingest_all(device_id: str) -> list[dict]:
-    """Re-pull every saved link so the agent is retrained on the latest content."""
+def reingest_all(device_id: str, on_progress=None) -> list[dict]:
+    """Re-pull every saved link (incremental) so the agent is retrained on the latest content."""
+    links = list_links(device_id)
     outcomes = []
-    for link in list_links(device_id):
+    for index, link in enumerate(links):
+        def _cb(done, total, label, _i=index, _ref=link["ref"]):
+            if on_progress:
+                tag = _ref.rstrip("/").split("/")[-1]
+                on_progress(done, total, f"[{_i + 1}/{len(links)}] {tag}: {label}")
         try:
-            result = add_or_refresh(device_id, link["kind"], link["ref"])
+            result = add_or_refresh(device_id, link["kind"], link["ref"], on_progress=_cb)
+            if on_progress and result.get("skipped"):
+                tag = link["ref"].rstrip("/").split("/")[-1]
+                on_progress(1, 1, f"[{index + 1}/{len(links)}] {tag}: up to date")
             outcomes.append({"ref": link["ref"], "ok": True, **result})
         except Exception as error:  # noqa: BLE001
             outcomes.append({"ref": link["ref"], "ok": False, "error": str(error)})

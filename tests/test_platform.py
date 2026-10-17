@@ -261,12 +261,15 @@ def _make_github_mocks(state: dict):
                 "files": files, "truncated": False, "matched": len(files)}
 
     def fake_items(device_id, owner, repo, items, link_id=None, on_progress=None, done_offset=0, total=None):
+        total = total if total is not None else len(items)
         count = 0
         for item in items:
             ingest.ingest_text(device_id, name=f"github:o/r/{item['path']}", kind="github",
                                text="register map content " * 30, link_id=link_id,
                                meta={"path": item["path"], "blob_sha": item["sha"]})
             count += 1
+            if on_progress:
+                on_progress(count, total, item["path"])
         return count, count
     return fake_listing, fake_items
 
@@ -312,6 +315,19 @@ class KnowledgePersistenceTests(PlatformTestBase):
             self.assertEqual(fourth["removed"], 1)
             paths = {s.get("path") for s in ingest.sources_by_link(device["id"], knowledge._link_id("github", "o/r"))}
             self.assertEqual(paths, {"b.c"})
+
+    def test_reingest_all_reports_progress(self):
+        device = devices.create_device(name="D", type="METER")
+        state = {"files": {"a.c": "s1", "b.c": "s2"}, "tree": "t1"}
+        listing, items = _make_github_mocks(state)
+        calls = []
+        with patch("knowledge.github.repo_listing", side_effect=listing), \
+             patch("knowledge.github.ingest_items", side_effect=items):
+            knowledge.add_or_refresh(device["id"], "github", "o/r")  # create the saved link
+            state["files"]["b.c"] = "s2b"  # a change so re-ingest does work
+            state["tree"] = "t2"
+            knowledge.reingest_all(device["id"], on_progress=lambda d, t, label: calls.append(label))
+        self.assertTrue(calls)
 
     def test_force_full_reingest(self):
         device = devices.create_device(name="D", type="METER")

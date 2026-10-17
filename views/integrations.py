@@ -106,8 +106,14 @@ def render() -> None:
         st.caption("No saved links yet. Ingested repos/pages appear here and persist across logins.")
         return
     if st.button("🔁 Re-ingest all (incremental — only changed files)"):
-        with st.spinner("Checking for changes and syncing..."):
-            outcomes = knowledge.reingest_all(device_id)
+        bar = st.progress(0.0, "Checking for changes…")
+
+        def _all_progress(done: int, total: int, label: str) -> None:
+            frac = (done / total) if total else 1.0
+            bar.progress(min(frac, 1.0), label[-80:])
+
+        outcomes = knowledge.reingest_all(device_id, on_progress=_all_progress)
+        bar.progress(1.0, "Done")
         ok = sum(1 for item in outcomes if item["ok"])
         changed = sum(1 for item in outcomes if item["ok"] and not item.get("skipped"))
         st.success(f"Synced {ok}/{len(outcomes)} links · {changed} had changes, "
