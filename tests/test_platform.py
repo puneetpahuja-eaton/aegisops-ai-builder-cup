@@ -206,7 +206,7 @@ class InferenceAndIntegrationParsers(PlatformTestBase):
         files = [{"path": f"src/f{i}.c", "sha": f"sha{i}", "size": 100} for i in range(5)]
         calls = []
         with patch("integrations.github._default_branch", return_value="main"), \
-             patch("integrations.github._list_files", return_value=(files, False, 5)), \
+             patch("integrations.github._list_files", return_value=(files, False, 5, "treesha")), \
              patch("integrations.github._fetch_blob", side_effect=lambda o, r, s: "register map voltage " * 30):
             result = github.ingest_repo(device["id"], "o/r",
                                         on_progress=lambda done, total, label: calls.append((done, total)))
@@ -253,6 +253,24 @@ def _fake_repo_ingest(device_id, ref, branch, link_id=None, on_progress=None):
             "matched": 1, "capped": False, "tree_truncated": False}
 
 
+def _make_github_mocks(state: dict):
+    """Build repo_listing / ingest_items side effects driven by a mutable file->sha map."""
+    def fake_listing(ref, branch=None):
+        files = [{"path": path, "sha": sha, "size": 100} for path, sha in state["files"].items()]
+        return {"owner": "o", "repo": "r", "branch": "main", "tree_sha": state["tree"],
+                "files": files, "truncated": False, "matched": len(files)}
+
+    def fake_items(device_id, owner, repo, items, link_id=None, on_progress=None, done_offset=0, total=None):
+        count = 0
+        for item in items:
+            ingest.ingest_text(device_id, name=f"github:o/r/{item['path']}", kind="github",
+                               text="register map content " * 30, link_id=link_id,
+                               meta={"path": item["path"], "blob_sha": item["sha"]})
+            count += 1
+        return count, count
+    return fake_listing, fake_items
+
+
 class KnowledgePersistenceTests(PlatformTestBase):
     def test_corpus_accumulates_and_persists_across_reads(self):
         device = devices.create_device(name="D", type="METER")
@@ -260,25 +278,64 @@ class KnowledgePersistenceTests(PlatformTestBase):
         ingest.ingest_text(device["id"], name="b", kind="document", text="breaker trip info " * 40)
         size = ingest.corpus_size(device["id"])
         self.assertGreaterEqual(size, 2)
-        # A fresh login reads the same on-disk store and still sees the knowledge.
         self.assertEqual(ingest.corpus_size(device["id"]), size)
         self.assertEqual(len(ingest.list_sources(device["id"])), 2)
 
-    def test_link_refresh_replaces_not_duplicates(self):
+    def test_incremental_refresh_only_processes_changes(self):
         device = devices.create_device(name="D", type="METER")
-        with patch("knowledge.github.ingest_repo", side_effect=_fake_repo_ingest):
-            knowledge.add_or_refresh(device["id"], "github", "o/r")
-            first = ingest.corpus_size(device["id"])
-            knowledge.add_or_refresh(device["id"], "github", "o/r")
-            second = ingest.corpus_size(device["id"])
-        self.assertEqual(first, second)
-        self.assertEqual(len(knowledge.list_links(device["id"])), 1)
+        state = {"files": {"a.c": "s1", "b.c": "s2"}, "tree": "t1"}
+        listing, items = _make_github_mocks(state)
+        with patch("knowledge.github.repo_listing", side_effect=listing), \
+             patch("knowledge.github.ingest_items", side_effect=items):
+            first = knowledge.add_or_refresh(device["id"], "github", "o/r")
+            self.assertEqual(first["added"], 2)
+            self.assertFalse(first.get("skipped"))
+            base_corpus = ingest.corpus_size(device["id"])
 
-    def test_links_persist_accumulate_and_delete(self):
+            # Unchanged tree -> whole repo skipped, no re-embedding.
+            second = knowledge.add_or_refresh(device["id"], "github", "o/r")
+            self.assertTrue(second["skipped"])
+            self.assertEqual(ingest.corpus_size(device["id"]), base_corpus)
+
+            # One file changes -> only that file is re-embedded; counts reflect it.
+            state["files"]["b.c"] = "s2b"
+            state["tree"] = "t2"
+            third = knowledge.add_or_refresh(device["id"], "github", "o/r")
+            self.assertEqual(third["updated"], 1)
+            self.assertEqual(third["added"], 0)
+            self.assertEqual(third["unchanged"], 1)
+
+            # A removed file drops its sources.
+            del state["files"]["a.c"]
+            state["tree"] = "t3"
+            fourth = knowledge.add_or_refresh(device["id"], "github", "o/r")
+            self.assertEqual(fourth["removed"], 1)
+            paths = {s.get("path") for s in ingest.sources_by_link(device["id"], knowledge._link_id("github", "o/r"))}
+            self.assertEqual(paths, {"b.c"})
+
+    def test_force_full_reingest(self):
         device = devices.create_device(name="D", type="METER")
-        with patch("knowledge.github.ingest_repo", side_effect=_fake_repo_ingest):
+        state = {"files": {"a.c": "s1"}, "tree": "t1"}
+        listing, items = _make_github_mocks(state)
+        with patch("knowledge.github.repo_listing", side_effect=listing), \
+             patch("knowledge.github.ingest_items", side_effect=items):
+            knowledge.add_or_refresh(device["id"], "github", "o/r")
+            forced = knowledge.add_or_refresh(device["id"], "github", "o/r", force=True)
+        self.assertFalse(forced.get("skipped"))
+        self.assertEqual(forced["added"], 1)
+
+    def test_links_persist_and_delete(self):
+        device = devices.create_device(name="D", type="METER")
+        state = {"files": {"a.c": "s1"}, "tree": "t1"}
+        listing, items = _make_github_mocks(state)
+        with patch("knowledge.github.repo_listing", side_effect=listing), \
+             patch("knowledge.github.ingest_items", side_effect=items):
             knowledge.add_or_refresh(device["id"], "github", "o/r1")
-            knowledge.add_or_refresh(device["id"], "github", "o/r2")
+            state2 = {"files": {"x.c": "s9"}, "tree": "t9"}
+            listing2, items2 = _make_github_mocks(state2)
+            with patch("knowledge.github.repo_listing", side_effect=listing2), \
+                 patch("knowledge.github.ingest_items", side_effect=items2):
+                knowledge.add_or_refresh(device["id"], "github", "o/r2")
         links = knowledge.list_links(device["id"])
         self.assertEqual(len(links), 2)
         corpus_before = ingest.corpus_size(device["id"])

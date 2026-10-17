@@ -76,16 +76,17 @@ def _is_text_path(path: str) -> bool:
     return low.endswith(_TEXT_EXT) or name in _TEXT_NAMES
 
 
-def _list_files(owner: str, repo: str, branch: str) -> tuple[list[dict], bool, int]:
+def _list_files(owner: str, repo: str, branch: str) -> tuple[list[dict], bool, int, str | None]:
     url = f"{_API}/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
     response = requests.get(url, headers=_headers(), timeout=30)
     response.raise_for_status()
     payload = response.json()
     truncated = bool(payload.get("truncated"))
+    tree_sha = payload.get("sha")
     matched = [item for item in payload.get("tree", [])
                if item.get("type") == "blob" and _is_text_path(item.get("path", ""))
                and item.get("size", 0) <= _MAX_BYTES]
-    return matched[:_MAX_FILES], truncated, len(matched)
+    return matched[:_MAX_FILES], truncated, len(matched), tree_sha
 
 
 def _fetch_blob(owner: str, repo: str, sha: str) -> str:
@@ -106,16 +107,19 @@ def parse_repo(repo_ref: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None,
-                link_id: str | None = None, on_progress=None) -> dict:
+def repo_listing(repo_ref: str, branch: str | None = None) -> dict:
+    """List matching files with their blob SHAs plus the repo's root tree SHA."""
     owner, repo = parse_repo(repo_ref)
     branch = branch or _default_branch(owner, repo)
-    files, truncated, matched = _list_files(owner, repo, branch)
-    if not files:
-        raise ValueError("No ingestible text files found in that repository.")
-    total = len(files)
-    if on_progress:
-        on_progress(0, total, "listing files")
+    files, truncated, matched, tree_sha = _list_files(owner, repo, branch)
+    return {"owner": owner, "repo": repo, "branch": branch, "tree_sha": tree_sha,
+            "files": files, "truncated": truncated, "matched": matched}
+
+
+def ingest_items(device_id: str, owner: str, repo: str, items: list[dict], link_id: str | None = None,
+                 on_progress=None, done_offset: int = 0, total: int | None = None) -> tuple[int, int]:
+    """Fetch and embed the given tree items. Returns (files_ingested, chunk_count)."""
+    total = total if total is not None else len(items)
 
     def _fetch(item: dict) -> tuple[dict, str | None]:
         try:
@@ -123,17 +127,34 @@ def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None,
         except requests.RequestException:
             return item, None
 
-    ingested, chunks, done = 0, 0, 0
-    # Fetch blobs concurrently (network-bound); embed/store sequentially (thread-safe).
+    ingested, chunks, done = 0, 0, done_offset
     with ThreadPoolExecutor(max_workers=8) as pool:
-        for item, text in pool.map(_fetch, files):
+        for item, text in pool.map(_fetch, items):
             done += 1
             if text and text.strip():
-                record = ingest.ingest_text(device_id, name=f"github:{owner}/{repo}/{item['path']}",
-                                            kind="github", text=text, link_id=link_id)
+                record = ingest.ingest_text(
+                    device_id, name=f"github:{owner}/{repo}/{item['path']}", kind="github",
+                    text=text, link_id=link_id, meta={"path": item["path"], "blob_sha": item["sha"]})
                 ingested += 1
                 chunks += record["chunk_count"]
             if on_progress:
                 on_progress(done, total, item["path"])
-    return {"files": ingested, "chunks": chunks, "repo": f"{owner}/{repo}", "branch": branch,
-            "matched": matched, "capped": matched > len(files), "tree_truncated": truncated}
+    return ingested, chunks
+
+
+def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None,
+                link_id: str | None = None, on_progress=None) -> dict:
+    """Full ingest (first time or forced). For incremental sync use knowledge.add_or_refresh."""
+    listing = repo_listing(repo_ref, branch)
+    files = listing["files"]
+    if not files:
+        raise ValueError("No ingestible text files found in that repository.")
+    if on_progress:
+        on_progress(0, len(files), "listing files")
+    ingested, chunks = ingest_items(device_id, listing["owner"], listing["repo"], files,
+                                    link_id=link_id, on_progress=on_progress, total=len(files))
+    return {"files": ingested, "chunks": chunks, "repo": f"{listing['owner']}/{listing['repo']}",
+            "branch": listing["branch"], "matched": listing["matched"],
+            "capped": listing["matched"] > len(files), "tree_truncated": listing["truncated"],
+            "tree_sha": listing["tree_sha"],
+            "file_shas": {item["path"]: item["sha"] for item in files}}

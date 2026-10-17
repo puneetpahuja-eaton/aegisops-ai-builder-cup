@@ -51,12 +51,11 @@ def _html_to_text(html: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-def ingest_page(device_id: str, page_ref: str, link_id: str | None = None, on_progress=None) -> dict:
-    if on_progress:
-        on_progress(0, 1, "fetching page")
+def fetch_page(page_ref: str) -> dict:
+    """Fetch a Confluence page's title, text and version (one HTTP call)."""
     base, email, api_token = _config()
     page_id = page_id_from(page_ref)
-    url = f"{base}/wiki/rest/api/content/{page_id}?expand=body.storage,title"
+    url = f"{base}/wiki/rest/api/content/{page_id}?expand=body.storage,title,version"
     response = requests.get(url, auth=_auth(email, api_token), timeout=20,
                             headers={"Accept": "application/json"})
     if response.status_code in (401, 403):
@@ -72,8 +71,17 @@ def ingest_page(device_id: str, page_ref: str, link_id: str | None = None, on_pr
     text = _html_to_text(html)
     if not text.strip():
         raise ValueError("The Confluence page returned no readable content.")
-    record = ingest.ingest_text(device_id, name=f"confluence:{title}", kind="confluence", text=text,
-                                link_id=link_id)
+    version = payload.get("version", {}).get("number")
+    return {"title": title, "text": text, "page_id": page_id, "version": version}
+
+
+def ingest_page(device_id: str, page_ref: str, link_id: str | None = None, on_progress=None) -> dict:
     if on_progress:
-        on_progress(1, 1, title)
-    return {"title": title, "chunks": record["chunk_count"], "page_id": page_id}
+        on_progress(0, 1, "fetching page")
+    page = fetch_page(page_ref)
+    record = ingest.ingest_text(device_id, name=f"confluence:{page['title']}", kind="confluence",
+                                text=page["text"], link_id=link_id, meta={"version": page["version"]})
+    if on_progress:
+        on_progress(1, 1, page["title"])
+    return {"title": page["title"], "chunks": record["chunk_count"], "page_id": page["page_id"],
+            "version": page["version"]}

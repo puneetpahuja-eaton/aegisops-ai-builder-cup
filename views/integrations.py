@@ -57,6 +57,8 @@ def render() -> None:
         st.subheader("GitHub repository")
         repo = st.text_input("owner/repo or URL", key="gh_repo", placeholder="eaton/prism-firmware")
         branch = st.text_input("Branch (optional)", key="gh_branch")
+        force = st.checkbox("Force full re-ingest (ignore cache)", key="gh_force",
+                            help="Off = incremental: only changed files are re-embedded.")
         if st.button("Ingest & save repository", disabled=not repo):
             bar = st.progress(0.0, "Starting…")
 
@@ -66,16 +68,21 @@ def render() -> None:
 
             try:
                 result = knowledge.add_or_refresh(device_id, "github", repo, branch or None,
-                                                  on_progress=_on_progress)
+                                                  on_progress=_on_progress, force=force)
             except Exception as error:  # noqa: BLE001
                 bar.empty()
                 st.error(str(error))
             else:
                 bar.progress(1.0, "Done")
-                st.success(f"Ingested {result['files']} of {result['matched']} matching files "
-                           f"({result['chunks']} chunks) from {result['repo']}@{result['branch']}. Saved.")
+                if result.get("skipped"):
+                    st.success(f"Up to date — no changes in {result['repo']}@{result['branch']} "
+                               f"({result['unchanged']} files unchanged).")
+                else:
+                    st.success(f"{result['repo']}@{result['branch']}: +{result.get('added', 0)} new, "
+                               f"~{result.get('updated', 0)} updated, −{result.get('removed', 0)} removed, "
+                               f"{result.get('unchanged', 0)} unchanged. Corpus: {result['chunks']} chunks.")
                 if result.get("capped"):
-                    st.warning(f"Only the first {result['files']} files were ingested (cap).")
+                    st.warning("Matched files exceed the cap; only the first were ingested.")
                 if result.get("tree_truncated"):
                     st.warning("GitHub truncated the file tree (very large repo); some paths were not listed.")
                 st.rerun()
@@ -98,11 +105,13 @@ def render() -> None:
     if not links:
         st.caption("No saved links yet. Ingested repos/pages appear here and persist across logins.")
         return
-    if st.button("🔁 Re-ingest all (retrain on latest)"):
-        with st.spinner("Re-pulling all saved links..."):
+    if st.button("🔁 Re-ingest all (incremental — only changed files)"):
+        with st.spinner("Checking for changes and syncing..."):
             outcomes = knowledge.reingest_all(device_id)
         ok = sum(1 for item in outcomes if item["ok"])
-        st.success(f"Refreshed {ok}/{len(outcomes)} links.")
+        changed = sum(1 for item in outcomes if item["ok"] and not item.get("skipped"))
+        st.success(f"Synced {ok}/{len(outcomes)} links · {changed} had changes, "
+                   f"{ok - changed} already up to date.")
         for bad in [item for item in outcomes if not item["ok"]]:
             st.error(f"{bad['ref']}: {bad['error']}")
         st.rerun()

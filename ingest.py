@@ -130,7 +130,7 @@ def _archive_to_gcs(device_id: str, filename: str, data: bytes) -> str | None:
 # Ingestion
 # --------------------------------------------------------------------------- #
 def ingest_text(device_id: str, *, name: str, kind: str, text: str, gcs_uri: str | None = None,
-                link_id: str | None = None) -> dict:
+                link_id: str | None = None, meta: dict | None = None) -> dict:
     if not devices.get_device(device_id):
         raise ValueError("No such device.")
     if kind not in SOURCE_KINDS:
@@ -153,6 +153,7 @@ def ingest_text(device_id: str, *, name: str, kind: str, text: str, gcs_uri: str
     record = {
         "id": source_id, "name": name, "kind": kind, "gcs_uri": gcs_uri, "link_id": link_id,
         "chunk_count": len(chunks), "char_count": len(text), "ingested_at": _now(), "status": "ready",
+        **(meta or {}),
     }
     datastore.set_doc(devices.sources_path(device_id), source_id, record)
     devices.update_device(device_id, {"status": "ready"})
@@ -187,6 +188,20 @@ def delete_by_link(device_id: str, link_id: str) -> int:
     removed = 0
     for source in datastore.list_docs(devices.sources_path(device_id)):
         if source.get("link_id") == link_id:
+            delete_source(device_id, source["id"])
+            removed += 1
+    return removed
+
+
+def sources_by_link(device_id: str, link_id: str) -> list[dict]:
+    return [s for s in datastore.list_docs(devices.sources_path(device_id)) if s.get("link_id") == link_id]
+
+
+def delete_sources_for_paths(device_id: str, link_id: str, paths: set[str]) -> int:
+    """Delete sources (and their chunks) for specific repo paths under a link."""
+    removed = 0
+    for source in datastore.list_docs(devices.sources_path(device_id)):
+        if source.get("link_id") == link_id and source.get("path") in paths:
             delete_source(device_id, source["id"])
             removed += 1
     return removed
