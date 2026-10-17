@@ -200,6 +200,13 @@ class InferenceAndIntegrationParsers(PlatformTestBase):
         with self.assertRaises(ValueError):
             github.parse_repo("justone")
 
+    def test_github_text_path_matching(self):
+        for path in ("src/main.c", "inc/driver.hpp", "CMakeLists.txt", "Makefile",
+                     "docs/readme.md", "build/toolchain.cmake", "data/registers.csv", "Dockerfile"):
+            self.assertTrue(github._is_text_path(path), path)
+        for path in ("firmware.bin", "image.png", "logo.svg", "archive.zip"):
+            self.assertFalse(github._is_text_path(path), path)
+
     def test_confluence_page_id_and_html(self):
         self.assertEqual(confluence.page_id_from("12345"), "12345")
         self.assertEqual(confluence.page_id_from("https://x.atlassian.net/wiki/spaces/A/pages/777/Title"), "777")

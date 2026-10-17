@@ -13,10 +13,27 @@ import secretmgr
 netsetup.configure_tls()
 
 _API = "https://api.github.com"
-_TEXT_EXT = (".md", ".txt", ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".go",
-             ".rs", ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".rst", ".sh")
-_MAX_FILES = 60
-_MAX_BYTES = 200_000
+_TEXT_EXT = (
+    # docs
+    ".md", ".markdown", ".rst", ".txt", ".adoc", ".tex",
+    # config / build
+    ".json", ".yaml", ".yml", ".toml", ".ini", ".cfg", ".conf", ".properties",
+    ".cmake", ".mk", ".mak", ".gradle", ".bazel", ".bzl", ".dox",
+    # data
+    ".csv", ".tsv", ".xml", ".html", ".css", ".scss",
+    # code
+    ".py", ".js", ".ts", ".tsx", ".jsx", ".java", ".kt", ".kts", ".scala",
+    ".c", ".cc", ".cpp", ".cxx", ".ino", ".h", ".hh", ".hpp", ".hxx", ".inc",
+    ".go", ".rs", ".swift", ".m", ".mm", ".rb", ".php", ".pl", ".lua", ".r",
+    ".sql", ".proto", ".s", ".asm", ".sh", ".bat", ".ps1", ".psm1",
+)
+# Common extensionless text files found in firmware/build repos.
+_TEXT_NAMES = frozenset({
+    "makefile", "gnumakefile", "dockerfile", "cmakelists.txt", "kconfig",
+    "kbuild", "readme", "license", "notice", "changelog",
+})
+_MAX_FILES = 500
+_MAX_BYTES = 1_000_000
 
 
 def token() -> str | None:
@@ -41,6 +58,9 @@ def _repo_info(owner: str, repo: str) -> dict:
             "(GitHub → Settings → Developer settings → PAT → Configure SSO).")
     if response.status_code == 401:
         raise ValueError("GitHub rejected the token (401). Check the token value and that it is still valid.")
+    if response.status_code == 403 and response.headers.get("X-RateLimit-Remaining") == "0":
+        hint = " Add a GitHub token in Integrations to raise the limit to 5000/hour." if not token() else ""
+        raise ValueError(f"GitHub API rate limit exceeded.{hint} Try again shortly.")
     response.raise_for_status()
     return response.json()
 
@@ -49,14 +69,22 @@ def _default_branch(owner: str, repo: str) -> str:
     return _repo_info(owner, repo).get("default_branch", "main")
 
 
-def _list_files(owner: str, repo: str, branch: str) -> list[dict]:
+def _is_text_path(path: str) -> bool:
+    low = path.lower()
+    name = low.rsplit("/", 1)[-1]
+    return low.endswith(_TEXT_EXT) or name in _TEXT_NAMES
+
+
+def _list_files(owner: str, repo: str, branch: str) -> tuple[list[dict], bool, int]:
     url = f"{_API}/repos/{owner}/{repo}/git/trees/{branch}?recursive=1"
     response = requests.get(url, headers=_headers(), timeout=30)
     response.raise_for_status()
-    tree = response.json().get("tree", [])
-    return [item for item in tree if item.get("type") == "blob"
-            and item.get("path", "").lower().endswith(_TEXT_EXT)
-            and item.get("size", 0) <= _MAX_BYTES][:_MAX_FILES]
+    payload = response.json()
+    truncated = bool(payload.get("truncated"))
+    matched = [item for item in payload.get("tree", [])
+               if item.get("type") == "blob" and _is_text_path(item.get("path", ""))
+               and item.get("size", 0) <= _MAX_BYTES]
+    return matched[:_MAX_FILES], truncated, len(matched)
 
 
 def _fetch_blob(owner: str, repo: str, sha: str) -> str:
@@ -80,7 +108,7 @@ def parse_repo(repo_ref: str) -> tuple[str, str]:
 def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None) -> dict:
     owner, repo = parse_repo(repo_ref)
     branch = branch or _default_branch(owner, repo)
-    files = _list_files(owner, repo, branch)
+    files, truncated, matched = _list_files(owner, repo, branch)
     if not files:
         raise ValueError("No ingestible text files found in that repository.")
     ingested, chunks = 0, 0
@@ -95,4 +123,5 @@ def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None) -> dic
                                     kind="github", text=text)
         ingested += 1
         chunks += record["chunk_count"]
-    return {"files": ingested, "chunks": chunks, "repo": f"{owner}/{repo}", "branch": branch}
+    return {"files": ingested, "chunks": chunks, "repo": f"{owner}/{repo}", "branch": branch,
+            "matched": matched, "capped": matched > len(files), "tree_truncated": truncated}

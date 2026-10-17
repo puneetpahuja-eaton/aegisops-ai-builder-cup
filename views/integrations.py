@@ -50,8 +50,13 @@ def render() -> None:
                 except Exception as error:  # noqa: BLE001
                     st.error(str(error))
                 else:
-                    st.success(f"Ingested {result['files']} files ({result['chunks']} chunks) "
-                               f"from {result['repo']}@{result['branch']}.")
+                    st.success(f"Ingested {result['files']} of {result['matched']} matching files "
+                               f"({result['chunks']} chunks) from {result['repo']}@{result['branch']}.")
+                    if result.get("capped"):
+                        st.warning(f"Only the first {result['files']} files were ingested (cap). "
+                                   "Narrow with a subfolder repo or raise the cap for full coverage.")
+                    if result.get("tree_truncated"):
+                        st.warning("GitHub truncated the file tree (very large repo); some paths were not listed.")
     with col2:
         st.subheader("Confluence page")
         page = st.text_input("Page ID or URL", key="cf_page")
