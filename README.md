@@ -168,6 +168,31 @@ detected with a rolling robust-z baseline and either auto-resolved on recovery o
 escalated, accumulating **estimated** downtime/cost avoided. Credentials are kept
 in Secret Manager, never in device records. Modbus and DLMS are disabled.
 
+## Persistence (across logins, logouts and deployments)
+
+Everything an admin configures is stored in the datastore/secret store, **not** in
+the login session, so it survives logout and re-login and **accumulates** over time:
+
+- **API keys / tokens** → secret store.
+- **Devices, uploaded knowledge (chunks + embeddings), and saved GitHub/Confluence
+  links** → datastore. Each new source *adds* to the device corpus; the agent gets
+  better as you feed more. Re-ingesting a saved link **refreshes** it (replaces its
+  chunks) instead of duplicating.
+- **Saved links** appear under **Integrations → Saved knowledge links** with
+  **Refresh** / **Remove**, plus **Re-ingest all** to retrain on the latest content.
+
+Backends:
+- **Local mode** (no cloud): persisted to a `.localstore/` JSON file on the host.
+  This survives restarts **on the same machine/path** but is not shared and is
+  **ephemeral on Cloud Run**.
+- **Cloud mode** (recommended for deployment): set `USE_FIRESTORE=1`,
+  `USE_SECRET_MANAGER=1` and `GCS_BUCKET` so devices/knowledge, secrets and large
+  files persist durably and across instances.
+
+If you switch the embedding backend (offline ↔ Vertex AI), vector dimensions
+change; stale-dimension chunks are ignored for retrieval. Use **Re-ingest all** to
+re-embed saved links with the new model.
+
 ## Replace telemetry in the Analysis engine
 
 In **Simulate / Upload**, or in **Analysis → Models & Data**, use the telemetry

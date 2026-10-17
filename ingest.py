@@ -129,7 +129,8 @@ def _archive_to_gcs(device_id: str, filename: str, data: bytes) -> str | None:
 # --------------------------------------------------------------------------- #
 # Ingestion
 # --------------------------------------------------------------------------- #
-def ingest_text(device_id: str, *, name: str, kind: str, text: str, gcs_uri: str | None = None) -> dict:
+def ingest_text(device_id: str, *, name: str, kind: str, text: str, gcs_uri: str | None = None,
+                link_id: str | None = None) -> dict:
     if not devices.get_device(device_id):
         raise ValueError("No such device.")
     if kind not in SOURCE_KINDS:
@@ -144,11 +145,11 @@ def ingest_text(device_id: str, *, name: str, kind: str, text: str, gcs_uri: str
     chunks_collection = devices.chunks_path(device_id)
     for index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
         datastore.set_doc(chunks_collection, f"{source_id}-{index}", {
-            "source_id": source_id, "source_name": name, "kind": kind,
+            "source_id": source_id, "source_name": name, "kind": kind, "link_id": link_id,
             "index": index, "text": chunk, "embedding": embedding,
         })
     record = {
-        "id": source_id, "name": name, "kind": kind, "gcs_uri": gcs_uri,
+        "id": source_id, "name": name, "kind": kind, "gcs_uri": gcs_uri, "link_id": link_id,
         "chunk_count": len(chunks), "char_count": len(text), "ingested_at": _now(), "status": "ready",
     }
     datastore.set_doc(devices.sources_path(device_id), source_id, record)
@@ -177,6 +178,16 @@ def delete_source(device_id: str, source_id: str) -> None:
         if chunk.get("source_id") == source_id:
             datastore.delete_doc(chunks_collection, chunk["id"])
     datastore.delete_doc(devices.sources_path(device_id), source_id)
+
+
+def delete_by_link(device_id: str, link_id: str) -> int:
+    """Remove all sources and chunks that came from one knowledge link (for refresh)."""
+    removed = 0
+    for source in datastore.list_docs(devices.sources_path(device_id)):
+        if source.get("link_id") == link_id:
+            delete_source(device_id, source["id"])
+            removed += 1
+    return removed
 
 
 def corpus_size(device_id: str) -> int:

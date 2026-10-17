@@ -15,6 +15,7 @@ import datastore
 import device_data
 import devices
 import ingest
+import knowledge
 import rag
 from integrations import confluence, github
 from live import rest_adapter, sim_feed
@@ -230,6 +231,47 @@ class DeviceDataTests(PlatformTestBase):
         device_data.set_synthetic(device["id"])
         self.assertEqual(device_data.mode(device["id"]), "synthetic")
         self.assertIsNone(device_data.get_dataset(device["id"]))
+
+
+def _fake_repo_ingest(device_id, ref, branch, link_id=None):
+    ingest.ingest_text(device_id, name=f"github:{ref}/f1", kind="github",
+                       text="voltage and current register map " * 40, link_id=link_id)
+    return {"files": 1, "chunks": 1, "repo": ref, "branch": "main",
+            "matched": 1, "capped": False, "tree_truncated": False}
+
+
+class KnowledgePersistenceTests(PlatformTestBase):
+    def test_corpus_accumulates_and_persists_across_reads(self):
+        device = devices.create_device(name="D", type="METER")
+        ingest.ingest_text(device["id"], name="a", kind="document", text="voltage sag info " * 40)
+        ingest.ingest_text(device["id"], name="b", kind="document", text="breaker trip info " * 40)
+        size = ingest.corpus_size(device["id"])
+        self.assertGreaterEqual(size, 2)
+        # A fresh login reads the same on-disk store and still sees the knowledge.
+        self.assertEqual(ingest.corpus_size(device["id"]), size)
+        self.assertEqual(len(ingest.list_sources(device["id"])), 2)
+
+    def test_link_refresh_replaces_not_duplicates(self):
+        device = devices.create_device(name="D", type="METER")
+        with patch("knowledge.github.ingest_repo", side_effect=_fake_repo_ingest):
+            knowledge.add_or_refresh(device["id"], "github", "o/r")
+            first = ingest.corpus_size(device["id"])
+            knowledge.add_or_refresh(device["id"], "github", "o/r")
+            second = ingest.corpus_size(device["id"])
+        self.assertEqual(first, second)
+        self.assertEqual(len(knowledge.list_links(device["id"])), 1)
+
+    def test_links_persist_accumulate_and_delete(self):
+        device = devices.create_device(name="D", type="METER")
+        with patch("knowledge.github.ingest_repo", side_effect=_fake_repo_ingest):
+            knowledge.add_or_refresh(device["id"], "github", "o/r1")
+            knowledge.add_or_refresh(device["id"], "github", "o/r2")
+        links = knowledge.list_links(device["id"])
+        self.assertEqual(len(links), 2)
+        corpus_before = ingest.corpus_size(device["id"])
+        knowledge.delete_link(device["id"], links[0]["id"])
+        self.assertEqual(len(knowledge.list_links(device["id"])), 1)
+        self.assertLess(ingest.corpus_size(device["id"]), corpus_before)
 
 
 if __name__ == "__main__":

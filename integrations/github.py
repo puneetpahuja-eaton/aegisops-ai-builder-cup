@@ -105,7 +105,8 @@ def parse_repo(repo_ref: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
-def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None) -> dict:
+def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None,
+                link_id: str | None = None) -> dict:
     owner, repo = parse_repo(repo_ref)
     branch = branch or _default_branch(owner, repo)
     files, truncated, matched = _list_files(owner, repo, branch)
@@ -120,7 +121,7 @@ def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None) -> dic
         if not text.strip():
             continue
         record = ingest.ingest_text(device_id, name=f"github:{owner}/{repo}/{item['path']}",
-                                    kind="github", text=text)
+                                    kind="github", text=text, link_id=link_id)
         ingested += 1
         chunks += record["chunk_count"]
     return {"files": ingested, "chunks": chunks, "repo": f"{owner}/{repo}", "branch": branch,

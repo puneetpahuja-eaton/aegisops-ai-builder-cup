@@ -81,3 +81,7 @@ def live_path(device_id: str) -> str:
 
 def telemetry_path(device_id: str) -> str:
     return f"{_DEVICES}/{device_id}/telemetry"
+
+
+def links_path(device_id: str) -> str:
+    return f"{_DEVICES}/{device_id}/links"

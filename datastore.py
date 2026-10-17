@@ -157,9 +157,12 @@ def nearest(collection: str, query_embedding: list[float], top_k: int = 6) -> li
     `_score`. Documents without an embedding are ignored.
     """
     scored: list[tuple[float, dict]] = []
+    query_dim = len(query_embedding)
     for doc in list_docs(collection):
         embedding = doc.get("embedding")
-        if not embedding:
+        if not embedding or len(embedding) != query_dim:
+            # Skip empty or different-dimension vectors (e.g. embedded with another
+            # model before an embedding-backend switch). Re-ingest to refresh them.
             continue
         scored.append((_cosine(query_embedding, embedding), doc))
     scored.sort(key=lambda pair: pair[0], reverse=True)
