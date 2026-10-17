@@ -118,7 +118,11 @@ def repo_listing(repo_ref: str, branch: str | None = None) -> dict:
 
 def ingest_items(device_id: str, owner: str, repo: str, items: list[dict], link_id: str | None = None,
                  on_progress=None, done_offset: int = 0, total: int | None = None) -> tuple[int, int]:
-    """Fetch and embed the given tree items. Returns (files_ingested, chunk_count)."""
+    """Fetch the given tree items in parallel and embed them in one batched pass.
+
+    Returns (files_ingested, chunk_count). Fetching is concurrent (network-bound);
+    embedding is batched with backoff so bulk ingests tolerate per-minute quotas.
+    """
     total = total if total is not None else len(items)
 
     def _fetch(item: dict) -> tuple[dict, str | None]:
@@ -127,19 +131,20 @@ def ingest_items(device_id: str, owner: str, repo: str, items: list[dict], link_
         except requests.RequestException:
             return item, None
 
-    ingested, chunks, done = 0, 0, done_offset
+    sources, done = [], done_offset
     with ThreadPoolExecutor(max_workers=8) as pool:
         for item, text in pool.map(_fetch, items):
             done += 1
             if text and text.strip():
-                record = ingest.ingest_text(
-                    device_id, name=f"github:{owner}/{repo}/{item['path']}", kind="github",
-                    text=text, link_id=link_id, meta={"path": item["path"], "blob_sha": item["sha"]})
-                ingested += 1
-                chunks += record["chunk_count"]
+                sources.append({"name": f"github:{owner}/{repo}/{item['path']}", "kind": "github",
+                                "text": text, "meta": {"path": item["path"], "blob_sha": item["sha"]}})
             if on_progress:
-                on_progress(done, total, item["path"])
-    return ingested, chunks
+                on_progress(done, total, f"fetch {item['path']}")
+
+    if on_progress and sources:
+        on_progress(done, total, f"embedding {len(sources)} files…")
+    result = ingest.ingest_many(device_id, sources, link_id=link_id)
+    return result["files"], result["chunks"]
 
 
 def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None,

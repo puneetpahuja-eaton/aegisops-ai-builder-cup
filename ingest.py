@@ -160,6 +160,65 @@ def ingest_text(device_id: str, *, name: str, kind: str, text: str, gcs_uri: str
     return record
 
 
+def ingest_many(device_id: str, items: list[dict], link_id: str | None = None, on_progress=None) -> dict:
+    """Ingest many sources with a single batched embedding pass.
+
+    Each item: {name, text, kind, meta?}. Chunks across all items are embedded
+    together (few API calls instead of one per source), which tolerates per-minute
+    embedding quotas far better. Returns {"files": n, "chunks": total}.
+    """
+    if not devices.get_device(device_id):
+        raise ValueError("No such device.")
+    prepared, all_chunks = [], []
+    for item in items:
+        text = item["text"]
+        if len(text) > _MAX_CHARS:
+            text = text[:_MAX_CHARS]
+        chunks = chunk_text(text)
+        if not chunks:
+            prepared.append(None)
+            continue
+        start = len(all_chunks)
+        all_chunks.extend(chunks)
+        prepared.append((item, chunks, start, start + len(chunks)))
+    embeddings = embed_texts(all_chunks)
+
+    files, total_chunks = 0, 0
+    chunks_collection = devices.chunks_path(device_id)
+    sources_collection = devices.sources_path(device_id)
+    for index, entry in enumerate(prepared):
+        if entry is None:
+            if on_progress:
+                on_progress(index + 1, len(prepared), items[index].get("name", ""))
+            continue
+        item, chunks, start, _end = entry
+        kind = item.get("kind", "other")
+        if kind not in SOURCE_KINDS:
+            kind = "other"
+        source_id = uuid.uuid4().hex
+        chunk_docs = {
+            f"{source_id}-{offset}": {
+                "source_id": source_id, "source_name": item["name"], "kind": kind, "link_id": link_id,
+                "index": offset, "text": chunk, "embedding": embeddings[start + offset],
+            }
+            for offset, chunk in enumerate(chunks)
+        }
+        datastore.set_docs(chunks_collection, chunk_docs)
+        record = {
+            "id": source_id, "name": item["name"], "kind": kind, "link_id": link_id,
+            "chunk_count": len(chunks), "char_count": len(item["text"]),
+            "ingested_at": _now(), "status": "ready", **(item.get("meta") or {}),
+        }
+        datastore.set_doc(sources_collection, source_id, record)
+        files += 1
+        total_chunks += len(chunks)
+        if on_progress:
+            on_progress(index + 1, len(prepared), item["name"])
+    if files:
+        devices.update_device(device_id, {"status": "ready"})
+    return {"files": files, "chunks": total_chunks}
+
+
 def ingest_file(device_id: str, filename: str, data: bytes, kind: str = "document") -> dict:
     text = extract_text(filename, data)
     gcs_uri = None
