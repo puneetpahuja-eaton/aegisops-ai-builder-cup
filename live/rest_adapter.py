@@ -47,10 +47,15 @@ def poll_rest(config: dict) -> dict:
     auth = None
     headers = {"Accept": "application/json"}
     secret = secretmgr.get_secret(config["secret_ref"]) if config.get("secret_ref") else None
-    if config.get("auth_mode") == "basic" and secret:
+    auth_mode = config.get("auth_mode", "none")
+    if auth_mode in ("basic", "digest") and secret:
         user, _, password = secret.partition(":")
-        auth = (user, password)
-    elif config.get("auth_mode") == "bearer" and secret:
+        if auth_mode == "digest":
+            from requests.auth import HTTPDigestAuth
+            auth = HTTPDigestAuth(user, password)
+        else:
+            auth = (user, password)
+    elif auth_mode == "bearer" and secret:
         headers["Authorization"] = "Bearer " + secret
 
     verify: object = config.get("verify_tls", True)

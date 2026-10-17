@@ -40,10 +40,13 @@ def _render_config(device: dict) -> dict:
     endpoint = st.text_input("REST endpoint", value=config.get("endpoint", ""), disabled=simulated,
                              placeholder="https://device.local/api/telemetry")
     col1, col2, col3 = st.columns(3)
-    auth_mode = col1.selectbox("Auth", ["none", "basic", "bearer"],
-                               index=["none", "basic", "bearer"].index(config.get("auth_mode", "none")),
-                               disabled=simulated)
-    username = col2.text_input("Username", disabled=simulated or auth_mode != "basic")
+    auth_modes = ["none", "basic", "digest", "bearer"]
+    auth_mode = col1.selectbox("Auth", auth_modes,
+                               index=auth_modes.index(config.get("auth_mode", "none"))
+                               if config.get("auth_mode", "none") in auth_modes else 0,
+                               disabled=simulated,
+                               help="Many embedded meter web servers use Digest auth, not Basic.")
+    username = col2.text_input("Username", disabled=simulated or auth_mode not in ("basic", "digest"))
     password = col3.text_input("Password / token", type="password",
                                disabled=simulated or auth_mode == "none")
     interval = st.slider("Poll interval (seconds)", 1, 30, value=int(config.get("interval", 3)))
@@ -82,8 +85,11 @@ def _render_config(device: dict) -> dict:
 
     if st.button("💾 Save connection"):
         secret_ref = config.get("secret_ref") or f"live_{device_id}"
+        cred_saved = False
         if not simulated and auth_mode != "none" and password:
-            secretmgr.put_secret(secret_ref, f"{username}:{password}" if auth_mode == "basic" else password)
+            value = f"{username}:{password}" if auth_mode in ("basic", "digest") else password
+            secretmgr.put_secret(secret_ref, value)
+            cred_saved = True
         ca_ref = config.get("ca_cert_ref") or f"live_ca_{device_id}"
         if not simulated and ca_pem.strip():
             secretmgr.put_secret(ca_ref, ca_pem.strip())
@@ -92,7 +98,10 @@ def _render_config(device: dict) -> dict:
                        "secret_ref": secret_ref, "verify_tls": verify_tls,
                        "ca_cert_ref": ca_ref if (ca_pem.strip() or config.get("ca_cert_ref")) else None})
         _save_config(device_id, config)
-        st.success("Saved connection configuration.")
+        if not simulated and auth_mode != "none" and not cred_saved and not secretmgr.get_secret(secret_ref):
+            st.warning("Saved, but no credentials are stored yet. Enter username/password and save again.")
+        else:
+            st.success("Saved connection configuration.")
     config["interval"] = interval
     config["simulated"] = simulated
     config["verify_tls"] = verify_tls

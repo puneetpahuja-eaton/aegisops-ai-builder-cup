@@ -226,6 +226,29 @@ class LiveAdapterTests(PlatformTestBase):
                                        "verify_tls": False, "field_map": {"m": "v"}})
         self.assertIs(captured.get("verify"), False)
 
+    def test_poll_rest_digest_auth(self):
+        payload = {"v": 1.0}
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        captured = {}
+
+        def fake_get(url, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+        with patch("live.rest_adapter.secretmgr.get_secret", return_value="admin:Admin@123"), \
+             patch("live.rest_adapter.requests.get", side_effect=fake_get):
+            rest_adapter.poll("rest", {"endpoint": "https://10.0.0.1/x", "auth_mode": "digest",
+                                       "secret_ref": "live_x", "verify_tls": False, "field_map": {"m": "v"}})
+        from requests.auth import HTTPDigestAuth
+        self.assertIsInstance(captured.get("auth"), HTTPDigestAuth)
+
     def test_poll_rest_verifies_by_default(self):
         payload = {"v": 1.0}
 
