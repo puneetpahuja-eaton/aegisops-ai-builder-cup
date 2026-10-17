@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 import re
+from urllib.parse import urlparse
 
 import requests
 
@@ -14,12 +15,15 @@ netsetup.configure_tls()
 
 
 def _config() -> tuple[str, str, str]:
-    base = os.getenv("CONFLUENCE_BASE_URL") or secretmgr.get_secret("confluence_base_url") or ""
+    raw_base = os.getenv("CONFLUENCE_BASE_URL") or secretmgr.get_secret("confluence_base_url") or ""
     email = os.getenv("CONFLUENCE_EMAIL") or secretmgr.get_secret("confluence_email") or ""
     api_token = os.getenv("CONFLUENCE_API_TOKEN") or secretmgr.get_secret("confluence_api_token") or ""
-    if not (base and email and api_token):
+    if not (raw_base and email and api_token):
         raise ValueError("Confluence is not configured. Set base URL, email and API token in Integrations.")
-    return base.rstrip("/"), email, api_token
+    # Accept any Atlassian URL the user pastes; use only the site origin.
+    parsed = urlparse(raw_base if "://" in raw_base else f"https://{raw_base}")
+    base = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else raw_base.rstrip("/")
+    return base, email, api_token
 
 
 def _auth(email: str, api_token: str) -> tuple[str, str]:
@@ -53,6 +57,12 @@ def ingest_page(device_id: str, page_ref: str) -> dict:
     url = f"{base}/wiki/rest/api/content/{page_id}?expand=body.storage,title"
     response = requests.get(url, auth=_auth(email, api_token), timeout=20,
                             headers={"Accept": "application/json"})
+    if response.status_code in (401, 403):
+        raise ValueError(f"Confluence rejected the request ({response.status_code}). Check the email and "
+                         "API token, and that this account can view the page.")
+    if response.status_code == 404:
+        raise ValueError(f"Confluence page {page_id} not found at {base}. Confirm the site base URL and that "
+                         "the page ID is correct and visible to this account.")
     response.raise_for_status()
     payload = response.json()
     title = payload.get("title", f"page-{page_id}")

@@ -31,10 +31,22 @@ def _headers() -> dict:
     return headers
 
 
-def _default_branch(owner: str, repo: str) -> str:
+def _repo_info(owner: str, repo: str) -> dict:
     response = requests.get(f"{_API}/repos/{owner}/{repo}", headers=_headers(), timeout=20)
+    if response.status_code == 404:
+        hint = "" if token() else " No token is configured — add one in Integrations for private repos."
+        raise ValueError(
+            f"Repository '{owner}/{repo}' not found or not accessible (404).{hint} For a private org repo, "
+            "ensure the token has the 'repo' scope AND is SSO-authorized for the organization "
+            "(GitHub → Settings → Developer settings → PAT → Configure SSO).")
+    if response.status_code == 401:
+        raise ValueError("GitHub rejected the token (401). Check the token value and that it is still valid.")
     response.raise_for_status()
-    return response.json().get("default_branch", "main")
+    return response.json()
+
+
+def _default_branch(owner: str, repo: str) -> str:
+    return _repo_info(owner, repo).get("default_branch", "main")
 
 
 def _list_files(owner: str, repo: str, branch: str) -> list[dict]:

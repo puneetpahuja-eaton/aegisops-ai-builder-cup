@@ -205,6 +205,12 @@ class InferenceAndIntegrationParsers(PlatformTestBase):
         self.assertEqual(confluence.page_id_from("https://x.atlassian.net/wiki/spaces/A/pages/777/Title"), "777")
         self.assertIn("Hello", confluence._html_to_text("<p>Hello</p><p>World</p>"))
 
+    def test_confluence_base_normalizes_to_origin(self):
+        with patch.dict(os.environ, {"CONFLUENCE_BASE_URL": "https://eaton-corp.atlassian.net/wiki/spaces/Perseus/",
+                                     "CONFLUENCE_EMAIL": "a@b.com", "CONFLUENCE_API_TOKEN": "tok"}):
+            base, _, _ = confluence._config()
+        self.assertEqual(base, "https://eaton-corp.atlassian.net")
+
 
 class DeviceDataTests(PlatformTestBase):
     def test_set_get_clear_dataset_local(self):
