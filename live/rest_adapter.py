@@ -4,6 +4,7 @@ from __future__ import annotations
 import datetime
 import os
 import re
+import struct
 import warnings
 from typing import Any
 
@@ -34,12 +35,21 @@ def _dig(payload: Any, path: str) -> Any:
     return current
 
 
-def _coerce_numbers(prefix: str, value: Any) -> dict[str, float]:
+def _parse_hex_word(token: str, hex_float: bool) -> float:
+    """Parse a 0x.. token as an IEEE-754 float32 or an unsigned integer."""
+    raw = int(token, 16)
+    if hex_float:
+        # Interpret the 32-bit pattern as an IEEE-754 single-precision float.
+        return float(struct.unpack(">f", struct.pack(">I", raw & 0xFFFFFFFF))[0])
+    return float(raw)
+
+
+def _coerce_numbers(prefix: str, value: Any, hex_float: bool = False) -> dict[str, float]:
     """Collect numeric leaves, parsing plain numbers, numeric strings and hex words.
 
     Device params often encode the value as comma-separated 32-bit hex words, e.g.
-    "0x0000000A,0x00000000" -> {prefix.0: 10, prefix.1: 0}. A single word maps to
-    `prefix` directly.
+    "0x0000000A,0x00000000". With hex_float the words are decoded as IEEE-754 float32;
+    otherwise as unsigned integers. A single word maps to `prefix` directly.
     """
     found: dict[str, float] = {}
     if isinstance(value, bool):
@@ -49,11 +59,11 @@ def _coerce_numbers(prefix: str, value: Any) -> dict[str, float]:
         return found
     if isinstance(value, dict):
         for key, item in value.items():
-            found.update(_coerce_numbers(f"{prefix}.{key}" if prefix else str(key), item))
+            found.update(_coerce_numbers(f"{prefix}.{key}" if prefix else str(key), item, hex_float))
         return found
     if isinstance(value, list):
         for index, item in enumerate(value):
-            found.update(_coerce_numbers(f"{prefix}.{index}" if prefix else str(index), item))
+            found.update(_coerce_numbers(f"{prefix}.{index}" if prefix else str(index), item, hex_float))
         return found
     if isinstance(value, str):
         text = value.strip()
@@ -63,8 +73,11 @@ def _coerce_numbers(prefix: str, value: Any) -> dict[str, float]:
         parsed: list[float] = []
         for token in tokens:
             try:
-                parsed.append(float(int(token, 16)) if token.lower().startswith("0x") else float(token))
-            except ValueError:
+                if token.lower().startswith("0x"):
+                    parsed.append(_parse_hex_word(token, hex_float))
+                else:
+                    parsed.append(float(token))
+            except (ValueError, struct.error):
                 return found  # Non-numeric string; skip it.
         if len(parsed) == 1:
             found[prefix or "value"] = parsed[0]
@@ -74,8 +87,8 @@ def _coerce_numbers(prefix: str, value: Any) -> dict[str, float]:
     return found
 
 
-def _flatten_numbers(payload: Any, prefix: str = "") -> dict[str, float]:
-    return _coerce_numbers(prefix, payload)
+def _flatten_numbers(payload: Any, prefix: str = "", hex_float: bool = False) -> dict[str, float]:
+    return _coerce_numbers(prefix, payload, hex_float)
 
 
 def poll_rest(config: dict) -> dict:
@@ -135,13 +148,14 @@ def poll_rest(config: dict) -> dict:
                 pass
 
     metrics: dict[str, float] = {}
+    hex_float = bool(config.get("hex_as_float"))
     field_map = config.get("field_map") or {}
     if field_map:
         for metric, path in field_map.items():
-            metrics.update(_coerce_numbers(metric, _dig(payload, path)))
+            metrics.update(_coerce_numbers(metric, _dig(payload, path), hex_float))
     else:
         # No explicit mapping yet: auto-discover numeric values so the feed isn't empty.
-        metrics = _coerce_numbers("", payload)
+        metrics = _coerce_numbers("", payload, hex_float)
     codes = []
     if config.get("event_path"):
         raw_codes = _dig(payload, config["event_path"])

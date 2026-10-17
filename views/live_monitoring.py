@@ -45,6 +45,10 @@ def _render_config(device: dict) -> dict:
         help="For /rs/param/<id>/value devices: list all param IDs, e.g. 22120, 22121, 22130. "
              "Each is polled every interval and its value is tracked. Leave blank to poll just the endpoint.")
     param_ids = [p.strip() for p in param_ids_text.split(",") if p.strip()]
+    hex_as_float = st.selectbox(
+        "Hex value format", ["IEEE-754 float (32-bit)", "Unsigned integer"],
+        index=0 if config.get("hex_as_float", True) else 1, disabled=simulated,
+        help="How to decode 0x.. hex words. Eaton meter params are IEEE-754 floats.") == "IEEE-754 float (32-bit)"
     col1, col2, col3 = st.columns(3)
     auth_modes = ["none", "basic", "digest", "bearer"]
     auth_mode = col1.selectbox("Auth", auth_modes,
@@ -102,6 +106,7 @@ def _render_config(device: dict) -> dict:
         config.update({"simulated": simulated, "endpoint": endpoint, "auth_mode": auth_mode,
                        "interval": interval, "field_map": field_map, "sample": sample,
                        "secret_ref": secret_ref, "verify_tls": verify_tls, "param_ids": param_ids,
+                       "hex_as_float": hex_as_float,
                        "ca_cert_ref": ca_ref if (ca_pem.strip() or config.get("ca_cert_ref")) else None})
         _save_config(device_id, config)
         if not simulated and auth_mode != "none" and not cred_saved and not secretmgr.get_secret(secret_ref):
@@ -113,6 +118,7 @@ def _render_config(device: dict) -> dict:
     config["verify_tls"] = verify_tls
     config["param_ids"] = param_ids
     config["endpoint"] = endpoint
+    config["hex_as_float"] = hex_as_float
     return config
 
 

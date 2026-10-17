@@ -226,6 +226,31 @@ class LiveAdapterTests(PlatformTestBase):
                                        "verify_tls": False, "field_map": {"m": "v"}})
         self.assertIs(captured.get("verify"), False)
 
+    def test_poll_rest_decodes_ieee754_float(self):
+        class FakeResponse:
+            def __init__(self, p):
+                self._p = p
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._p
+
+        # 0x41F00000 == 30.0, 0x3F800000 == 1.0 in IEEE-754 float32.
+        with patch("live.rest_adapter.requests.get",
+                   return_value=FakeResponse({"pid": 1, "value": "0x41F00000,0x3F800000"})):
+            reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/1/value",
+                                                 "auth_mode": "none", "hex_as_float": True})
+        self.assertAlmostEqual(reading["metrics"]["value.0"], 30.0, places=4)
+        self.assertAlmostEqual(reading["metrics"]["value.1"], 1.0, places=4)
+        # Zero stays zero either way.
+        with patch("live.rest_adapter.requests.get",
+                   return_value=FakeResponse({"pid": 1, "value": "0x00000000"})):
+            reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/1/value",
+                                                 "auth_mode": "none", "hex_as_float": True})
+        self.assertEqual(reading["metrics"]["value"], 0.0)
+
     def test_poll_rest_parses_hex_value_words(self):
         class FakeResponse:
             def __init__(self, p):
