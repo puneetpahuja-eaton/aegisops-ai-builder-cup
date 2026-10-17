@@ -114,7 +114,7 @@ class PrismParityTests(unittest.TestCase):
         self.assertTrue(all(fault.resolved_sample is None for fault in engine.faults))
 
     def test_dashboard_has_all_original_tabs_controls_and_metrics(self):
-        app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=60).run()
+        app = AppTest.from_file(str(ROOT / "prism_reference" / "dashboard" / "app.py"), default_timeout=60).run()
         self.assertEqual(len(app.exception), 0)
         self.assertEqual([tab.label for tab in app.tabs],
                          ["Live Operations", "Cases", "Counterfactual (value)", "Power Topology", "Models & Data", "How it works"])

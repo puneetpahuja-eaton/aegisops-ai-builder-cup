@@ -1,13 +1,60 @@
-# PRISM | Google Cloud edition
+# AegisOps — Multi-Device AI Reliability Platform (Google Cloud edition)
 
-Manufacturing reliability simulation with the participant-owned original PRISM
-dashboard and agent engine, extended with Gemini on Vertex AI, private Cloud
-Storage inputs, BigQuery audit and Cloud Run hosting.
+A role-based platform that onboards industrial devices, **learns from their
+documents and data (RAG)**, analyzes both fed and **live** telemetry with an
+agentic engine, and answers questions in a grounded Gemini chat. Built on Google
+Cloud: Gemini on Vertex AI, Vertex AI embeddings, Firestore, Cloud Storage,
+BigQuery, Secret Manager and Cloud Run.
 
 - Live application: https://aegis-ops-498775210896.asia-south1.run.app
 - Source: https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
 
-## Original PRISM, not a redesigned dashboard
+## What it does
+
+1. **Role-based login** (admin / engineer / viewer) — Firestore-backed, hashed
+   passwords. Admin configures; engineer runs analysis and live monitoring and
+   approves; viewer sees analysis and chat only.
+2. **Multi-device onboarding** — admins register any number of devices.
+3. **Feed data** — upload PDF / Word / Excel / CSV / text, paste notes, or pull
+   from **GitHub** and **Confluence**. Everything is extracted, chunked, embedded
+   (Vertex AI `text-embedding-004`) and stored as per-device knowledge.
+4. **Analysis** — the proven PRISM power-reliability engine runs per device on
+   synthetic or uploaded telemetry, with all six original tabs.
+5. **Live monitoring** — the agent reads the device's datasheet to decide which
+   REST fields to poll, then streams and analyzes telemetry in real time,
+   auto-resolving or escalating issues with estimated downtime/cost avoided.
+   **REST is enabled; Modbus and DLMS are intentionally disabled** in this edition.
+6. **Grounded chat** — a Gemini-style assistant answers only from the selected
+   device's ingested data and the current analysis, with citations.
+
+### Pages by role
+
+| Page | admin | engineer | viewer |
+|---|---|---|---|
+| Device Manager, Data Sources, Integrations, Simulate/Upload, User Admin | ✅ | — | — |
+| Analysis | ✅ | ✅ | ✅ |
+| Live Monitoring | ✅ | ✅ | — |
+| Ask the device (chat) | ✅ | ✅ | ✅ |
+
+## Architecture
+
+- **Streamlit multi-page** (`app.py` → `st.navigation`, role-gated).
+- **Datastore** (`datastore.py`): Firestore when configured, else a local JSON
+  store so the platform runs and is testable with **no cloud credentials**.
+  Vector similarity is computed in-process over each device's bounded corpus.
+- **Auth** (`auth.py`): PBKDF2-hashed passwords, roles, seeded admin.
+- **Ingestion** (`ingest.py`): extract → chunk → embed → store.
+- **Embeddings** (`embeddings.py`): Vertex AI, with a deterministic offline fallback.
+- **RAG** (`rag.py`): retrieve top-k chunks → grounded Gemini answer with citations.
+- **Integrations** (`integrations/`): GitHub + Confluence.
+- **Live** (`live/`): REST adapter, agent field-mapping, rolling anomaly monitor,
+  built-in simulated feed for credential-free demos.
+- **Analysis engine**: the unchanged PRISM package (`prism_reference/prism`,
+  byte-identical to `prism_reference/manifest.json`) plus cloud adapters
+  (`prism_cloud.py`, `prism_extensions.py`), embedded as the Analysis page.
+- **Secrets** (`secretmgr.py`): Secret Manager, else a local gitignored store.
+
+## The embedded PRISM analysis
 
 The default application preserves the original six tabs and their fields:
 
@@ -72,35 +119,64 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-Streamlit 1.65+ is required for persistent tabs/expanders. Select
-**Explicit offline simulation** for a credential-free run. Offline results are
-explicitly labeled, never presented as Google AI.
+Streamlit 1.65+ is required (role-gated `st.navigation`, keyed tabs/expanders and
+`st.fragment` live polling). With **no credentials** the platform runs fully on
+the local store and offline reasoning — ideal for development and the test suite.
+Offline results are explicitly labeled, never presented as Google AI.
 
-For the configured Windows cloud deployment, use `.\run_local.ps1`.
-It starts the same interface on port 8502 with a short-lived gcloud token.
-Restart the script after token expiration.
+**First run** seeds a demo admin (override with `AEGIS_ADMIN_EMAIL` /
+`AEGIS_ADMIN_PASSWORD`): `admin@aegisops.demo` / `admin12345`. Create engineer and
+viewer accounts from **User Admin**.
 
-For Vertex AI, configure:
+To enable Google Cloud, set in `.env`:
 
 ```text
 USE_VERTEX=1
 GOOGLE_CLOUD_PROJECT=your-project
 GOOGLE_CLOUD_LOCATION=global
 GEMINI_MODEL=gemini-2.5-flash
+EMBED_MODEL=text-embedding-004
+USE_FIRESTORE=1
+FIRESTORE_PROJECT=your-project
+USE_SECRET_MANAGER=1
+GCS_BUCKET=your-bucket
+BQ_DATASET=your_dataset
 ```
 
 Use `gcloud auth application-default login` locally. Cloud Run uses its attached
 service identity. AI Studio remains available with `USE_VERTEX=0` and a local
 `GEMINI_API_KEY`. Never commit credentials or disable TLS verification.
 
-## Replace telemetry without losing the original UI
+## Feed data and integrations
 
-In **Models & Data**, expand **Replace telemetry / download original fleet fields**:
+- **Data Sources** (admin): upload PDF/Word/Excel/CSV/text or paste notes. Each
+  source is extracted, chunked and embedded into the selected device's corpus.
+- **Integrations** (admin): save a GitHub token and/or Confluence credentials
+  (stored in Secret Manager), then ingest a repository (`owner/repo`) or a
+  Confluence page (ID or URL) into the device's corpus.
+- **Simulate / Upload** (admin): attach the built-in synthetic PRISM simulator,
+  generate a dataset snapshot, or upload your own CSV/JSON telemetry.
 
-1. Click **Prepare PRISM telemetry templates**.
+## Live monitoring (REST)
+
+In **Live Monitoring** (engineer/admin): keep the built-in simulated feed for a
+credential-free demo, or point it at a real REST endpoint. Paste a sample
+response and click **Ask agent to map fields** — the agent reads the device's
+datasheet (RAG) and the sample to propose which JSON fields map to telemetry
+metrics. **Start** streams readings at the configured interval; anomalies are
+detected with a rolling robust-z baseline and either auto-resolved on recovery or
+escalated, accumulating **estimated** downtime/cost avoided. Credentials are kept
+in Secret Manager, never in device records. Modbus and DLMS are disabled.
+
+## Replace telemetry in the Analysis engine
+
+In **Simulate / Upload**, or in **Analysis → Models & Data**, use the telemetry
+template:
+
+1. Prepare the PRISM telemetry template.
 2. Download the CSV or JSON containing the original asset metadata and measurements.
 3. Replace the data with authorized, non-confidential measurements.
-4. Upload it and click **Replace entire fleet**.
+4. Upload it and replace the fleet.
 
 A successful replacement resets the topology, history-trained models, cases,
 timeline and trace. Invalid input leaves the existing replay unchanged.
@@ -145,19 +221,19 @@ Do not upload confidential, personal or employer data. The SOP stays fictional.
 
 ## Safety and truthful interpretation
 
-- Every original automatic action changes **synthetic simulator state only**.
-  No equipment command or external work-order dispatch exists.
-- The original playbook's electrical action labels are simulator descriptions,
-  not operating/servicing instructions for real equipment.
-- Recovery is verified against later synthetic snapshots using PRISM's original
-  verifier and three-sample grace period; it is not proof of a production repair.
-- Downtime/cost fields reproduce the original **assumption-based counterfactual**.
+- Every automatic action in the Analysis engine changes **synthetic simulator
+  state only**. No equipment command or external work-order dispatch exists.
+- Live monitoring **reads** telemetry over REST; it never writes to or controls a
+  device. Its downtime/cost-avoided figures are **estimates**, not measured savings.
+- RAG answers are grounded only in ingested sources and cite them; ingested
+  documents are treated as untrusted data and never followed as instructions.
+- Recovery is verified against later snapshots, not proof of a production repair.
+- Downtime/cost fields reproduce an **assumption-based counterfactual**.
   Realized production savings are $0 measured.
-- Ground-truth accuracy is a comparison against built-in scenario labels, not
-  validated accuracy on factory data. Before diagnosed cases exist, it shows `n/a`.
-- Quote checking proves textual provenance, not industrial correctness or full
-  entailment of a generated explanation.
+- Ground-truth accuracy compares against built-in scenario labels, not validated
+  accuracy on factory data. Before diagnosed cases exist, it shows `n/a`.
 - This is a reliability/triage prototype, not validated predictive maintenance.
+  Do not upload confidential, personal or employer data. SOPs are fictional.
 
 ## Verification
 

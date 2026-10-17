@@ -1,6 +1,30 @@
 # Verification record | October 17, 2026
 
-## Original PRISM / Google Cloud edition (current)
+## Multi-device platform (current)
+
+- The app is now a role-gated multi-page platform (`app.py` → `st.navigation`).
+  Roles admin/engineer/viewer are enforced; passwords are PBKDF2-hashed.
+- 81 unittest/Streamlit AppTest regressions pass with Python 3.11.9: the 54 PRISM
+  engine/parity/fleet tests, 23 platform tests (auth, datastore, devices,
+  ingestion, RAG, live monitor, REST adapter, integrations parsers, device data)
+  and 4 app-shell smoke tests.
+- Verified end-to-end in a real browser (offline/local mode, no credentials):
+  login as admin → add device → ingest a source (RAG corpus) → open Analysis
+  (the embedded PRISM dashboard with all six original tabs, scoped to the device,
+  stepping telemetry) → grounded chat answer with a citation → Live Monitoring
+  with the built-in simulated REST feed streaming readings and auto-detecting /
+  auto-resolving an injected anomaly with estimated cost avoided.
+- The platform runs with no cloud credentials via a local JSON store and offline
+  reasoning (clearly labeled, never presented as Google AI). With Firestore,
+  Secret Manager, Vertex AI, Cloud Storage and BigQuery configured it uses those.
+- Integrations (GitHub/Confluence) and live REST against a real endpoint require
+  the participant's API keys / device endpoint; parsers and adapters are unit
+  tested, and credentials are stored in Secret Manager, never in device records.
+
+Pending for submission: deploy the platform revision to Cloud Run, re-record the
+demo video for the new multi-device flow, and refresh the proposal deck.
+
+## Original PRISM / Google Cloud edition (analysis engine)
 
 - All 54 unittest/Streamlit AppTest regressions passed with Python 3.11.9,
   including the ten exact-PRISM parity/integration tests. The final full run

@@ -1,6 +1,7 @@
 .env
 __pycache__/
 *.pyc
+.localstore/
 last_run.txt
 loop_test.txt
 *.log
