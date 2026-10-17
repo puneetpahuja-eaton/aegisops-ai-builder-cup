@@ -46,7 +46,7 @@ def log_cases(cases: list[dict]) -> int:
     rows = [
         {
             "ts": now, "case_id": c["case_id"],
-            "revision": 1 if c["approval"]["approved"] else 0,
+            "revision": c.get("audit_revision", 1 if c["approval"]["approved"] else 0),
             "asset_id": c["evidence"]["asset_id"],
             "root_cause": c["diagnosis"]["root_cause"],
             "cited_sop_ids": ",".join(c["diagnosis"]["cited_sop_ids"]),

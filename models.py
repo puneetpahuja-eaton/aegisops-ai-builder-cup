@@ -18,7 +18,7 @@ class Asset(Contract):
 
 class Metric(Contract):
     unit: str = Field(default="", max_length=20)
-    baseline: list[float] = Field(min_length=5, max_length=1000)
+    baseline: list[float] = Field(min_length=5, max_length=20_000)
     latest: float
 
 

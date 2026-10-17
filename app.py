@@ -109,7 +109,7 @@ def render_case(case: dict) -> None:
 def main() -> None:
     st.title("AegisOps")
     st.caption("Evidence -> grounded hypothesis -> human review -> sandbox action -> verification")
-    st.warning("Hackathon sandbox: synthetic telemetry and fictional SOPs. No real equipment control, repair, or production savings.")
+    st.warning("Hackathon sandbox: fictional SOPs; built-in telemetry is synthetic, uploads are chronological replay. No real equipment control or measured savings.")
     with st.sidebar:
         st.header("Run configuration")
         offline = st.toggle("Explicit offline simulation", value=not is_live())
@@ -117,11 +117,16 @@ def main() -> None:
         st.write("Documents:", storage.backend())
         st.write("Audit history:", "BigQuery" if bq.is_enabled() else "session only")
         st.caption("Gemini is only marked successful after a validated response. Cloud errors are never replaced silently.")
+        workspace = st.radio("Workspace", ["Fleet operations", "Single incident"], key="workspace")
     try:
-        scenarios = load_scenarios()
         sop = load_sop()
+        scenarios = load_scenarios() if workspace == "Single incident" else []
     except (GoogleAPICallError, GoogleAuthError, ValueError, OSError) as error:
         st.error(f"Data loading failed. Check storage configuration: {error}")
+        return
+    if workspace == "Fleet operations":
+        from fleet_ui import render_fleet
+        render_fleet(sop, offline=offline)
         return
     names = [incident["asset"]["id"] for incident in scenarios]
     selection = st.multiselect("Synthetic incidents", names, default=names[:1])

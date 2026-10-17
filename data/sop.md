@@ -37,3 +37,32 @@ All eligible sandbox actions require named supervisor approval.
 Recovery can only be reported when supplied post-action readings are complete
 and pass the anomaly checks. Missing readings mean unverified, not recovered.
 Synthetic recovery is not evidence of real downtime reduction or financial savings.
+
+## SOP-106 Supply disturbance and topology correlation
+Low voltage with VOLT_SAG or INPUT_UNDERVOLT indicates a possible supply disturbance.
+Simultaneous downstream voltage symptoms can support an upstream supply hypothesis,
+but topology correlation does not prove the physical cause.
+For a noncritical asset without physical-repair codes, propose only a named-reviewer
+sandbox containment scenario. Never send electrical switching or equipment commands.
+Do not merge a downstream bearing or pressure fault into a supply-disturbance case.
+In fleet replay, verification requires two consecutive healthy subsequent snapshots
+within three ticks, covering the root candidate and all correlated symptom assets.
+Uploaded measurements are never changed by approval; subsequent recovery is observational.
+
+## SOP-107 Battery reserve indication
+BATT_WEAK, SELFTEST_FAIL or a low battery state of charge can indicate reserve risk.
+These signals do not prove battery damage. Battery-related conditions require
+qualified engineer review; physical intervention is not reversible in this sandbox policy.
+Provide a review-only handoff, never battery servicing instructions.
+
+## SOP-108 Harmonic distortion indication
+Elevated thd_pct with THD_HIGH or WAVEFORM_DISTORT supports a waveform-distortion hypothesis.
+For a noncritical asset without physical-repair codes, a supervisor may approve a
+fully synthetic restored-metric scenario. No real filter or setpoint control is permitted.
+
+## SOP-109 Load and breaker indications
+Elevated load_pct, current_a or OVERLOAD_ALARM can support an overload hypothesis.
+A noncritical asset may have a reviewed, fully synthetic restored-load scenario.
+BREAKER_OPEN and downstream LOAD_LOST require assessment of the entire affected topology.
+Do not reclose a physical breaker or provide electrical switching instructions.
+Critical or unknown-criticality affected assets always require engineer escalation.

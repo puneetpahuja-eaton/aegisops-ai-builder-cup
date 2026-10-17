@@ -4,6 +4,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from collections.abc import Callable
 
 from google.api_core.exceptions import GoogleAPICallError
 from google.auth.exceptions import GoogleAuthError
@@ -35,11 +36,22 @@ def load_scenarios() -> list[dict]:
     return [Incident.model_validate(incident).model_dump() for incident in data]
 
 
-def run_case(incident: dict, sop_text: str, *, offline: bool = False) -> dict:
+def run_case(
+    incident: dict, sop_text: str, *, offline: bool = False,
+    context: dict | None = None,
+    on_event: Callable[[str, str, dict], None] | None = None,
+) -> dict:
     started = time.monotonic()
     incident = Incident.model_validate(incident).model_dump()
     evidence = build_evidence(incident)
+    if context is not None:
+        evidence["fleet_context"] = context
+    def emit(agent: str, tool: str, detail: dict) -> None:
+        if on_event:
+            on_event(agent, tool, detail)
+    emit("Monitor", "build_evidence", evidence)
     errors = []
+    emit("Diagnostician", "grounded_diagnosis_started", {"asset_id": evidence["asset_id"], "offline": offline})
     try:
         diagnosis = diagnose(evidence, sop_text, offline=offline)
     except MODEL_FAILURES as error:
@@ -57,7 +69,23 @@ def run_case(incident: dict, sop_text: str, *, offline: bool = False) -> dict:
             "insufficient_evidence": True,
             "_source": "unavailable",
         }
+    emit("Diagnostician", "grounded_diagnosis_completed", diagnosis)
     decision = decide(evidence, diagnosis)
+    if context and context.get("unknown_codes"):
+        decision.update(action="escalate", requires_approval=False)
+        decision["reasons"].append("Unrecognized event codes require engineer review.")
+    if context and context.get("protected_symptom_assets"):
+        decision.update(action="escalate", requires_approval=False)
+        decision["reasons"].append("Correlated symptoms affect critical or unknown-criticality assets.")
+    if context and context.get("playbook"):
+        playbook = context["playbook"]
+        decision["reversibility"] = playbook["reversibility"]
+        decision["sandbox_action"] = playbook["action"]
+        if playbook["reversibility"] == "NONE" or diagnosis["confidence"] < playbook["min_confidence"]:
+            decision.update(action="escalate", requires_approval=False)
+            decision["reasons"].append("Playbook reversibility/confidence policy requires engineer review.")
+    emit("Decider", "safety_gate", decision)
+    emit("Actuator", "prepare_review_output", {"action": decision["action"]})
     try:
         action = act(evidence, diagnosis, decision, sop_text, offline=offline)
     except MODEL_FAILURES as error:
@@ -65,6 +93,7 @@ def run_case(incident: dict, sop_text: str, *, offline: bool = False) -> dict:
         errors.append(f"Work order unavailable: {type(error).__name__}: {error}")
         action = {"type": "unavailable", "status": "failed", "summary": "Work order generation failed. Manual review required."}
     verification = verify(incident, evidence, decision)
+    emit("Actuator", "review_output_ready", action)
     return {
         "case_id": str(uuid.uuid4()),
         "mode": "offline simulation" if offline else "Google AI / synthetic telemetry",

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 CONFIDENCE_THRESHOLD = 0.6
 # Event-code prefixes that always require a physical/human repair.
-PHYSICAL_REPAIR_PREFIXES = ("BRG", "PRS-LOW", "LEAK", "SMOKE")
+PHYSICAL_REPAIR_PREFIXES = ("BRG", "PRS-LOW", "LEAK", "SMOKE", "BATT", "SELFTEST_FAIL", "FAN_FAULT")
 
 
 def decide(evidence: dict, diagnosis: dict) -> dict:

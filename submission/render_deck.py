@@ -29,18 +29,18 @@ def slides():
             "For plant supervisors and reliability engineers: turn fragmented alarms and sensor readings into a traceable incident brief.",
             "Synthetic hackathon sandbox. No real equipment control or production savings claims.",
         ]),
-        ("The problem and the narrow wedge", "A number is not an engineer-ready decision", [
-            "Target task: incident triage for motors, pumps and pressure systems.",
-            "Today: interpret deviations, find relevant procedures and assemble the engineer handoff.",
-            "Product hypothesis: cited context and a complete review-only work order reduce gathering effort and improve handoff quality.",
+        ("The problem and the narrow wedge", "One upstream fault should not become twenty tickets", [
+            "Fleet triage for plant equipment and its power chain, with chronological telemetry replacement.",
+            "Group downstream supply symptoms without hiding independent bearing, pressure or battery risks.",
+            "Product hypothesis: trained evidence, topology and a cited engineer handoff reduce gathering effort.",
             "Validate this hypothesis with an approved pilot; no invented customer or market statistics.",
         ]),
         ("A complete, reviewable workflow", "Monitor -> Diagnose -> Decide -> Act -> Verify", [
-            "Monitor: robust-z evidence, with disclosed baseline assumptions.",
-            "Diagnose: Gemini hypotheses with schema validation and source-checked SOP quotes.",
-            "Decide: independent gates for criticality, physical-repair codes, severe vibration and insufficient evidence.",
-            "Act: named approval for sandbox scenarios, or review-only engineer work order.",
-            "Verify: explicit post-action readings; missing data stays unverified and continued anomalies reopen.",
+            "Monitor: healthy-history robust-z + Isolation Forest, Markov event patterns and a live tool trace.",
+            "Diagnose: topology correlation plus Vertex AI hypotheses and validated source passages.",
+            "Decide/Act: reversibility policy, protected-asset gates, named sandbox approval or review-only handoff.",
+            "Verify: two healthy future ticks within three; recurrence reopens. Uploads are never rewritten.",
+            "22-asset power demo: six synthetic scenarios, plus replaceable CSV/JSON manufacturing telemetry.",
         ]),
         ("Google Cloud architecture", "Real services, not decorative integrations", [
             "Cloud Run: deployed application, scale-to-zero, one-instance demo limit.",

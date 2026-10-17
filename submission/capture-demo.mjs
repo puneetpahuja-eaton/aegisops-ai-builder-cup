@@ -47,6 +47,7 @@ const run = async (asset) => {
 
 try {
   await page.goto("https://aegis-ops-498775210896.asia-south1.run.app");
+  await page.getByText("Single incident", { exact: true }).click();
   await page.getByRole("button", { name: "Run reliability loop", exact: true }).waitFor();
   await capture("home.png");
   await run("MTR-07");
