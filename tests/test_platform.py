@@ -115,6 +115,17 @@ class IngestionTests(PlatformTestBase):
         self.assertIn("a,b", ingest.extract_text("x.csv", b"a,b\n1,2"))
         self.assertIn("hello", ingest.extract_text("x.txt", b"hello world"))
 
+    def test_reembed_stale_fixes_dimension(self):
+        device = devices.create_device(name="D", type="METER")
+        ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage sag info " * 40)
+        datastore.set_doc(devices.chunks_path(device["id"]), "stale-1",
+                          {"source_id": "s", "source_name": "old", "kind": "document", "index": 0,
+                           "text": "calibration procedure for voltage and current", "embedding": [0.1] * 10})
+        self.assertEqual(ingest.embedding_health(device["id"])["stale"], 1)
+        result = ingest.reembed_stale(device["id"])
+        self.assertEqual(result["reembedded"], 1)
+        self.assertEqual(ingest.embedding_health(device["id"])["stale"], 0)
+
 
 class RagTests(PlatformTestBase):
     def test_offline_answer_is_grounded_and_labeled(self):

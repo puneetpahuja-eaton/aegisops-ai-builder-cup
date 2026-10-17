@@ -268,3 +268,40 @@ def delete_sources_for_paths(device_id: str, link_id: str, paths: set[str]) -> i
 
 def corpus_size(device_id: str) -> int:
     return datastore.count_docs(devices.chunks_path(device_id))
+
+
+def embedding_health(device_id: str) -> dict:
+    """Report how many chunks match the current embedding model's dimension."""
+    target_dim = len(embed_texts(["probe"])[0])
+    chunks = datastore.list_docs(devices.chunks_path(device_id))
+    current = sum(1 for c in chunks if len(c.get("embedding") or []) == target_dim)
+    return {"total": len(chunks), "current": current, "stale": len(chunks) - current, "dim": target_dim}
+
+
+def reembed_stale(device_id: str, on_progress=None) -> dict:
+    """Re-embed chunks whose vector dimension differs from the current model.
+
+    Reuses each chunk's stored text (no re-download), batched with backoff. This
+    fixes a corpus after switching embedding backends (offline <-> Vertex).
+    """
+    target_dim = len(embed_texts(["probe"])[0])
+    chunks_collection = devices.chunks_path(device_id)
+    stale = [c for c in datastore.list_docs(chunks_collection)
+             if len(c.get("embedding") or []) != target_dim]
+    if not stale:
+        return {"reembedded": 0, "dim": target_dim}
+    batch = 64
+    reembedded = 0
+    for start in range(0, len(stale), batch):
+        group = stale[start:start + batch]
+        vectors = embed_texts([c.get("text", "") for c in group])
+        updates = {}
+        for chunk, vector in zip(group, vectors):
+            doc = {k: v for k, v in chunk.items() if k != "id"}
+            doc["embedding"] = vector
+            updates[chunk["id"]] = doc
+        datastore.set_docs(chunks_collection, updates)
+        reembedded += len(group)
+        if on_progress:
+            on_progress(reembedded, len(stale), f"re-embedded {reembedded}/{len(stale)}")
+    return {"reembedded": reembedded, "dim": target_dim}

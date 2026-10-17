@@ -61,6 +61,29 @@ def render() -> None:
     sources = ingest.list_sources(device_id)
     st.caption(f"Corpus size: **{ingest.corpus_size(device_id)}** embedded chunks across "
                f"**{len(sources)}** sources.")
+    health = ingest.embedding_health(device_id)
+    if health["stale"]:
+        st.warning(f"{health['stale']} of {health['total']} chunks were embedded with a different model "
+                   f"(dimension ≠ {health['dim']}) and are **ignored during search**. Re-embed them with the "
+                   "current model to make all knowledge searchable — this reuses stored text (no re-download).")
+        if st.button("🔧 Re-embed stale chunks with current model"):
+            bar = st.progress(0.0, "Re-embedding…")
+
+            def _re(done: int, total: int, label: str) -> None:
+                bar.progress(min(done / total, 1.0) if total else 1.0, label)
+
+            try:
+                result = ingest.reembed_stale(device_id, on_progress=_re)
+            except Exception as error:  # noqa: BLE001
+                bar.empty()
+                st.error(f"Re-embedding failed (likely a quota limit — retry): {error}")
+            else:
+                bar.progress(1.0, "Done")
+                st.success(f"Re-embedded {result['reembedded']} chunks at dimension {result['dim']}. "
+                           "All knowledge is now searchable.")
+                st.rerun()
+    else:
+        st.caption(f"All chunks match the current embedding model (dimension {health['dim']}). ✅")
     for source in sources:
         cols = st.columns([3, 2, 2, 1])
         cols[0].markdown(f"**{source['name']}**")
