@@ -7,7 +7,10 @@ import re
 import requests
 
 import ingest
+import netsetup
 import secretmgr
+
+netsetup.configure_tls()
 
 
 def _config() -> tuple[str, str, str]:

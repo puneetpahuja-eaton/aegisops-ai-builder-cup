@@ -6,7 +6,10 @@ from typing import Any
 
 import requests
 
+import netsetup
 import secretmgr
+
+netsetup.configure_tls()
 
 ENABLED_PROTOCOLS = {"rest": True, "modbus": False, "dlms": False}
 

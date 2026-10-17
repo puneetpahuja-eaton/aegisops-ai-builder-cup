@@ -3,6 +3,10 @@ from __future__ import annotations
 
 import streamlit as st
 
+import netsetup
+
+netsetup.configure_tls()
+
 import auth
 import devices
 import ui_common

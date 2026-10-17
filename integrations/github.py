@@ -7,7 +7,10 @@ import os
 import requests
 
 import ingest
+import netsetup
 import secretmgr
+
+netsetup.configure_tls()
 
 _API = "https://api.github.com"
 _TEXT_EXT = (".md", ".txt", ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".go",
