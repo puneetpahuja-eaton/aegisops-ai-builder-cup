@@ -205,6 +205,48 @@ class LiveAdapterTests(PlatformTestBase):
         self.assertEqual(reading["metrics"]["voltage_v"], 480.5)
         self.assertEqual(reading["codes"], ["OK"])
 
+    def test_poll_rest_skips_tls_verification_when_opted_in(self):
+        payload = {"v": 1.0}
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        captured = {}
+
+        def fake_get(url, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+        with patch("live.rest_adapter.requests.get", side_effect=fake_get):
+            rest_adapter.poll("rest", {"endpoint": "https://10.0.0.1/x", "auth_mode": "none",
+                                       "verify_tls": False, "field_map": {"m": "v"}})
+        self.assertIs(captured.get("verify"), False)
+
+    def test_poll_rest_verifies_by_default(self):
+        payload = {"v": 1.0}
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return payload
+
+        captured = {}
+
+        def fake_get(url, **kwargs):
+            captured.update(kwargs)
+            return FakeResponse()
+
+        with patch("live.rest_adapter.requests.get", side_effect=fake_get):
+            rest_adapter.poll("rest", {"endpoint": "https://x/y", "auth_mode": "none", "field_map": {"m": "v"}})
+        self.assertNotIn("verify", {k: v for k, v in captured.items() if v is False})
+        self.assertTrue(captured.get("verify", True))
+
     def test_simulated_feed_shapes(self):
         reading = sim_feed.simulated_reading(5, inject_anomaly=True)
         self.assertIn("temperature_c", reading["metrics"])

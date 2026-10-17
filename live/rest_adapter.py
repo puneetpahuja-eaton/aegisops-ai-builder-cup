@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import datetime
+import os
+import warnings
 from typing import Any
 
 import requests
@@ -32,11 +34,12 @@ def _dig(payload: Any, path: str) -> Any:
 
 
 def poll_rest(config: dict) -> dict:
-    """Poll a REST endpoint once and return {timestamp, metrics, raw}.
+    """Poll a REST endpoint once and return {timestamp, metrics, codes, raw}.
 
     config = {
       endpoint, auth_mode ('none'|'basic'|'bearer'), secret_ref,
-      field_map {metric_name: json_path}, event_path (optional)
+      field_map {metric_name: json_path}, event_path (optional),
+      verify_tls (bool, default True), ca_cert_ref (optional secret holding a CA PEM)
     }
     Credentials are read from Secret Manager via secret_ref, never stored inline.
     """
@@ -48,11 +51,38 @@ def poll_rest(config: dict) -> dict:
         user, _, password = secret.partition(":")
         auth = (user, password)
     elif config.get("auth_mode") == "bearer" and secret:
-        headers["Authorization"] = f"Bearer {secret}"
+        headers["Authorization"] = "Bearer " + secret
 
-    response = requests.get(endpoint, headers=headers, auth=auth, timeout=15)
-    response.raise_for_status()
-    payload = response.json()
+    verify: object = config.get("verify_tls", True)
+    ca_pem = secretmgr.get_secret(config["ca_cert_ref"]) if config.get("ca_cert_ref") else None
+    ca_temp: str | None = None
+    if verify and ca_pem:
+        # Pin the device's own CA certificate (preferred over disabling verification).
+        import tempfile
+        handle = tempfile.NamedTemporaryFile("w", suffix=".pem", delete=False)
+        handle.write(ca_pem)
+        handle.close()
+        ca_temp = handle.name
+        verify = ca_temp
+
+    try:
+        if verify is False:
+            # Explicit, per-device opt-in for a private field device with a self-signed
+            # certificate. Suppress only this call's insecure-request warning.
+            import urllib3
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", urllib3.exceptions.InsecureRequestWarning)
+                response = requests.get(endpoint, headers=headers, auth=auth, timeout=15, verify=False)
+        else:
+            response = requests.get(endpoint, headers=headers, auth=auth, timeout=15, verify=verify)
+        response.raise_for_status()
+        payload = response.json()
+    finally:
+        if ca_temp:
+            try:
+                os.unlink(ca_temp)
+            except OSError:
+                pass
 
     metrics: dict[str, float] = {}
     for metric, path in (config.get("field_map") or {}).items():

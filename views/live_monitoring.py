@@ -48,6 +48,19 @@ def _render_config(device: dict) -> dict:
                                disabled=simulated or auth_mode == "none")
     interval = st.slider("Poll interval (seconds)", 1, 30, value=int(config.get("interval", 3)))
 
+    with st.expander("🔒 TLS / certificate (for HTTPS field devices)"):
+        st.caption("On-prem devices often use a self-signed or private-CA certificate. Prefer pinning the "
+                   "device's CA certificate. Skipping verification is an explicit opt-in for a trusted "
+                   "private-network device only.")
+        ca_pem = st.text_area("Device CA certificate (PEM, optional)", value="", height=100,
+                              disabled=simulated, placeholder="-----BEGIN CERTIFICATE-----\n...")
+        verify_tls = not st.checkbox(
+            "Skip TLS verification (insecure — private-network device only)",
+            value=not config.get("verify_tls", True), disabled=simulated,
+            help="Equivalent to curl -k. Only use for a device you trust on an internal network.")
+        if not verify_tls:
+            st.warning("TLS verification is OFF for this device. Use only on a trusted private network.")
+
     st.subheader("What to monitor")
     st.caption("Let the agent read this device's datasheet and a sample response to map the fields.")
     sample = st.text_area("Sample response JSON (optional, for agent mapping)",
@@ -71,13 +84,18 @@ def _render_config(device: dict) -> dict:
         secret_ref = config.get("secret_ref") or f"live_{device_id}"
         if not simulated and auth_mode != "none" and password:
             secretmgr.put_secret(secret_ref, f"{username}:{password}" if auth_mode == "basic" else password)
+        ca_ref = config.get("ca_cert_ref") or f"live_ca_{device_id}"
+        if not simulated and ca_pem.strip():
+            secretmgr.put_secret(ca_ref, ca_pem.strip())
         config.update({"simulated": simulated, "endpoint": endpoint, "auth_mode": auth_mode,
                        "interval": interval, "field_map": field_map, "sample": sample,
-                       "secret_ref": secret_ref})
+                       "secret_ref": secret_ref, "verify_tls": verify_tls,
+                       "ca_cert_ref": ca_ref if (ca_pem.strip() or config.get("ca_cert_ref")) else None})
         _save_config(device_id, config)
         st.success("Saved connection configuration.")
     config["interval"] = interval
     config["simulated"] = simulated
+    config["verify_tls"] = verify_tls
     return config
 
 
