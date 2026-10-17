@@ -25,7 +25,8 @@ def render() -> None:
     st.title("💬 Ask the device")
     st.caption("Grounded in each device's ingested data (RAG). Answers cite the sources used.")
     status = rag.status()
-    st.caption(f"Embeddings: `{status['embeddings']}` · Model: `{status['model']}`")
+    st.caption(f"Embeddings: `{status['embeddings']}` · Model: `{status['model']}` · "
+               f"retrieves top {status.get('top_k', 24)} passages · remembers the conversation")
 
     device = ui_common.device_selector("chat_device")
     if not device:
@@ -52,7 +53,8 @@ def render() -> None:
     with st.chat_message("assistant"):
         with st.spinner("Retrieving and answering..."):
             result = rag.answer(device_id, prompt, screen_context=_screen_context(device_id),
-                                role=ui_common.current_role())
+                                role=ui_common.current_role(),
+                                history=st.session_state[history_key][:-1])
         st.markdown(result["answer"])
         if result.get("citations"):
             st.caption("Sources: " + ", ".join(result["citations"]))

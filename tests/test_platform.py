@@ -126,6 +126,18 @@ class RagTests(PlatformTestBase):
         self.assertIn("Offline", result["answer"])
         self.assertTrue(result["sources"])
 
+    def test_history_is_accepted_and_formatted(self):
+        history = [{"role": "user", "content": "what is the capacity?"},
+                   {"role": "assistant", "content": "200 waveforms."}]
+        formatted = rag._format_history(history)
+        self.assertIn("User: what is the capacity?", formatted)
+        self.assertIn("Assistant: 200 waveforms.", formatted)
+        device = devices.create_device(name="Meter", type="METER")
+        ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage sag info " * 40)
+        # Offline answer should still work when history is passed.
+        result = rag.answer(device["id"], "and the voltage?", history=history)
+        self.assertTrue(result["grounded"])
+
     def test_no_corpus_returns_guidance(self):
         device = devices.create_device(name="Empty", type="METER")
         result = rag.answer(device["id"], "anything")
