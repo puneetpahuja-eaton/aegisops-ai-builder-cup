@@ -22,6 +22,9 @@ _MODEL = os.getenv("EMBED_MODEL", "text-embedding-004")
 _TOKEN = re.compile(r"[a-z0-9]+")
 _BATCH = int(os.getenv("EMBED_BATCH", "16"))
 _MAX_RETRIES = int(os.getenv("EMBED_MAX_RETRIES", "6"))
+# text-embedding-004 allows up to 20,000 input tokens per request across the batch.
+# Budget by characters (code tokenizes densely); keep a safe margin under the limit.
+_CHAR_BUDGET = int(os.getenv("EMBED_CHAR_BUDGET", "24000"))
 
 
 def backend() -> str:
@@ -39,6 +42,18 @@ def _offline_embed(text: str) -> list[float]:
     return vector
 
 
+def _batches(texts: list[str]):
+    batch, chars = [], 0
+    for text in texts:
+        if batch and (chars + len(text) > _CHAR_BUDGET or len(batch) >= _BATCH):
+            yield batch
+            batch, chars = [], 0
+        batch.append(text)
+        chars += len(text)
+    if batch:
+        yield batch
+
+
 def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
@@ -49,8 +64,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
 
     out: list[list[float]] = []
     with _client() as client:
-        for start in range(0, len(texts), _BATCH):
-            batch = texts[start:start + _BATCH]
+        for batch in _batches(texts):
             for attempt in range(_MAX_RETRIES):
                 try:
                     result = client.models.embed_content(model=_MODEL, contents=batch)
