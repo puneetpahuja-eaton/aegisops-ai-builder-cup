@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import datetime
 import os
+import re
 import warnings
 from typing import Any
 
@@ -33,30 +34,48 @@ def _dig(payload: Any, path: str) -> Any:
     return current
 
 
-def _flatten_numbers(payload: Any, prefix: str = "") -> dict[str, float]:
-    """Collect every numeric leaf as {dotted_path: value}."""
+def _coerce_numbers(prefix: str, value: Any) -> dict[str, float]:
+    """Collect numeric leaves, parsing plain numbers, numeric strings and hex words.
+
+    Device params often encode the value as comma-separated 32-bit hex words, e.g.
+    "0x0000000A,0x00000000" -> {prefix.0: 10, prefix.1: 0}. A single word maps to
+    `prefix` directly.
+    """
     found: dict[str, float] = {}
-    if isinstance(payload, bool):
+    if isinstance(value, bool):
         return found
-    if isinstance(payload, (int, float)):
-        if prefix:
-            found[prefix] = float(payload)
+    if isinstance(value, (int, float)):
+        found[prefix or "value"] = float(value)
         return found
-    if isinstance(payload, dict):
-        for key, value in payload.items():
-            found.update(_flatten_numbers(value, f"{prefix}.{key}" if prefix else str(key)))
-    elif isinstance(payload, list):
-        for index, value in enumerate(payload):
-            found.update(_flatten_numbers(value, f"{prefix}.{index}" if prefix else str(index)))
-    elif isinstance(payload, str):
-        # Many device APIs return the value as a numeric string, e.g. {"value": "231.4"}.
-        try:
-            number = float(payload.strip())
-        except (ValueError, AttributeError):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            found.update(_coerce_numbers(f"{prefix}.{key}" if prefix else str(key), item))
+        return found
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            found.update(_coerce_numbers(f"{prefix}.{index}" if prefix else str(index), item))
+        return found
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
             return found
-        if prefix:
-            found[prefix] = number
+        tokens = [token.strip() for token in text.split(",") if token.strip()]
+        parsed: list[float] = []
+        for token in tokens:
+            try:
+                parsed.append(float(int(token, 16)) if token.lower().startswith("0x") else float(token))
+            except ValueError:
+                return found  # Non-numeric string; skip it.
+        if len(parsed) == 1:
+            found[prefix or "value"] = parsed[0]
+        else:
+            for index, number in enumerate(parsed):
+                found[f"{prefix}.{index}" if prefix else str(index)] = number
     return found
+
+
+def _flatten_numbers(payload: Any, prefix: str = "") -> dict[str, float]:
+    return _coerce_numbers(prefix, payload)
 
 
 def poll_rest(config: dict) -> dict:
@@ -119,27 +138,10 @@ def poll_rest(config: dict) -> dict:
     field_map = config.get("field_map") or {}
     if field_map:
         for metric, path in field_map.items():
-            value = _dig(payload, path)
-            if isinstance(value, (int, float)) and not isinstance(value, bool):
-                metrics[metric] = float(value)
-            elif isinstance(value, str):
-                try:
-                    metrics[metric] = float(value.strip())
-                except (ValueError, AttributeError):
-                    pass
+            metrics.update(_coerce_numbers(metric, _dig(payload, path)))
     else:
         # No explicit mapping yet: auto-discover numeric values so the feed isn't empty.
-        if isinstance(payload, bool):
-            metrics = {}
-        elif isinstance(payload, (int, float)):
-            metrics = {"value": float(payload)}
-        elif isinstance(payload, str):
-            try:
-                metrics = {"value": float(payload.strip())}
-            except (ValueError, AttributeError):
-                metrics = {}
-        else:
-            metrics = _flatten_numbers(payload)
+        metrics = _coerce_numbers("", payload)
     codes = []
     if config.get("event_path"):
         raw_codes = _dig(payload, config["event_path"])
@@ -153,7 +155,46 @@ def poll_rest(config: dict) -> dict:
     }
 
 
+_PARAM_URL = re.compile(r"(/rs/param/)(\d+)(/value)")
+
+
+def poll_params(config: dict) -> dict:
+    """Poll several /rs/param/<id>/value endpoints and merge their values.
+
+    config adds `param_ids` (list[str|int]); the endpoint's numeric param id is the
+    template. Each param's `value` is labeled `p<id>` (or `p<id>.<word>` for multi-word
+    hex). The combined raw map is returned for inspection.
+    """
+    param_ids = [str(pid).strip() for pid in config.get("param_ids") or [] if str(pid).strip()]
+    endpoint = config["endpoint"]
+    if not param_ids or not _PARAM_URL.search(endpoint):
+        return poll_rest(config)
+
+    merged: dict[str, float] = {}
+    raw: dict[str, Any] = {}
+    errors: list[str] = []
+    for pid in param_ids:
+        url = _PARAM_URL.sub(lambda m: f"{m.group(1)}{pid}{m.group(3)}", endpoint)
+        try:
+            reading = poll_rest({**config, "endpoint": url, "field_map": None})
+        except Exception as error:  # noqa: BLE001
+            errors.append(f"param {pid}: {error}")
+            continue
+        raw[pid] = reading.get("raw")
+        for key, value in reading["metrics"].items():
+            label = f"p{pid}" if key == "value" else f"p{pid}.{key}"
+            merged[label] = value
+    if not merged and errors:
+        raise RuntimeError("; ".join(errors[:4]))
+    return {
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "metrics": merged, "codes": [], "raw": raw, "errors": errors,
+    }
+
+
 def poll(protocol: str, config: dict) -> dict:
     if not ENABLED_PROTOCOLS.get(protocol, False):
         raise ProtocolDisabled(f"Protocol '{protocol}' is disabled in this edition. Use REST.")
+    if config.get("param_ids"):
+        return poll_params(config)
     return poll_rest(config)

@@ -226,6 +226,49 @@ class LiveAdapterTests(PlatformTestBase):
                                        "verify_tls": False, "field_map": {"m": "v"}})
         self.assertIs(captured.get("verify"), False)
 
+    def test_poll_rest_parses_hex_value_words(self):
+        class FakeResponse:
+            def __init__(self, p):
+                self._p = p
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._p
+
+        with patch("live.rest_adapter.requests.get",
+                   return_value=FakeResponse({"pid": 22120, "value": "0x0000000A,0x00000000,0x000000FF"})):
+            reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/22120/value", "auth_mode": "none"})
+        self.assertEqual(reading["metrics"]["value.0"], 10.0)
+        self.assertEqual(reading["metrics"]["value.2"], 255.0)
+
+    def test_poll_params_merges_multiple_ids(self):
+        responses = {
+            "22120": {"pid": 22120, "value": "0x0000000A"},
+            "22121": {"pid": 22121, "value": "0x00000014"},
+        }
+
+        class FakeResponse:
+            def __init__(self, p):
+                self._p = p
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._p
+
+        def fake_get(url, **kwargs):
+            pid = url.rstrip("/").split("/")[-2]
+            return FakeResponse(responses[pid])
+
+        with patch("live.rest_adapter.requests.get", side_effect=fake_get):
+            reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/22120/value",
+                                                 "auth_mode": "none", "param_ids": ["22120", "22121"]})
+        self.assertEqual(reading["metrics"]["p22120"], 10.0)
+        self.assertEqual(reading["metrics"]["p22121"], 20.0)
+
     def test_poll_rest_auto_extracts_numeric_without_map(self):
         for payload, expected_key, expected_val in [
             ({"value": 231.4}, "value", 231.4),

@@ -38,7 +38,13 @@ def _render_config(device: dict) -> dict:
                           value=config.get("simulated", True),
                           help="Great for the demo. Turn off to poll a real REST endpoint.")
     endpoint = st.text_input("REST endpoint", value=config.get("endpoint", ""), disabled=simulated,
-                             placeholder="https://device.local/api/telemetry")
+                             placeholder="https://10.130.178.92/rs/param/22120/value")
+    param_ids_text = st.text_input(
+        "Parameter IDs to monitor (comma-separated, optional)", disabled=simulated,
+        value=", ".join(str(p) for p in (config.get("param_ids") or [])),
+        help="For /rs/param/<id>/value devices: list all param IDs, e.g. 22120, 22121, 22130. "
+             "Each is polled every interval and its value is tracked. Leave blank to poll just the endpoint.")
+    param_ids = [p.strip() for p in param_ids_text.split(",") if p.strip()]
     col1, col2, col3 = st.columns(3)
     auth_modes = ["none", "basic", "digest", "bearer"]
     auth_mode = col1.selectbox("Auth", auth_modes,
@@ -95,7 +101,7 @@ def _render_config(device: dict) -> dict:
             secretmgr.put_secret(ca_ref, ca_pem.strip())
         config.update({"simulated": simulated, "endpoint": endpoint, "auth_mode": auth_mode,
                        "interval": interval, "field_map": field_map, "sample": sample,
-                       "secret_ref": secret_ref, "verify_tls": verify_tls,
+                       "secret_ref": secret_ref, "verify_tls": verify_tls, "param_ids": param_ids,
                        "ca_cert_ref": ca_ref if (ca_pem.strip() or config.get("ca_cert_ref")) else None})
         _save_config(device_id, config)
         if not simulated and auth_mode != "none" and not cred_saved and not secretmgr.get_secret(secret_ref):
@@ -105,6 +111,8 @@ def _render_config(device: dict) -> dict:
     config["interval"] = interval
     config["simulated"] = simulated
     config["verify_tls"] = verify_tls
+    config["param_ids"] = param_ids
+    config["endpoint"] = endpoint
     return config
 
 
