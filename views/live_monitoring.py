@@ -170,6 +170,8 @@ def render() -> None:
             monitor.observe(reading)
             st.session_state[hist_key].append({"timestamp": reading["timestamp"], **reading["metrics"]})
             st.session_state[hist_key] = st.session_state[hist_key][-120:]
+            st.session_state[f"live_lastraw_{device_id}"] = reading.get("raw")
+            st.session_state[f"live_lastmetrics_{device_id}"] = reading.get("metrics")
 
         summary = monitor.summary()
         metric_cols = st.columns(5)
@@ -182,12 +184,25 @@ def render() -> None:
                    "estimates only, not measured savings.")
 
         history = st.session_state.get(hist_key, [])
+        last_metrics = st.session_state.get(f"live_lastmetrics_{device_id}")
+        if last_metrics is not None and not config.get("simulated", True):
+            if last_metrics:
+                st.caption("Latest extracted values: " + ", ".join(
+                    f"{k}={v}" for k, v in list(last_metrics.items())[:10]))
+            else:
+                st.warning("The device responded but no numeric value was found. Expand the raw response "
+                           "below and map the field, or the value may be non-numeric.")
         if history:
             frame = pd.DataFrame(history).set_index("timestamp")
-            st.line_chart(frame)
+            if len(frame.columns):
+                st.line_chart(frame)
         if monitor.issues:
             st.subheader("Detected issues")
             st.dataframe(list(reversed(monitor.issues)), hide_index=True, width="stretch")
+        raw = st.session_state.get(f"live_lastraw_{device_id}")
+        if raw is not None and not config.get("simulated", True):
+            with st.expander("🔎 Latest raw device response"):
+                st.json(raw)
 
     with placeholder:
         live_panel()

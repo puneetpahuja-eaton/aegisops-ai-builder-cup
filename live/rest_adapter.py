@@ -33,6 +33,32 @@ def _dig(payload: Any, path: str) -> Any:
     return current
 
 
+def _flatten_numbers(payload: Any, prefix: str = "") -> dict[str, float]:
+    """Collect every numeric leaf as {dotted_path: value}."""
+    found: dict[str, float] = {}
+    if isinstance(payload, bool):
+        return found
+    if isinstance(payload, (int, float)):
+        if prefix:
+            found[prefix] = float(payload)
+        return found
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            found.update(_flatten_numbers(value, f"{prefix}.{key}" if prefix else str(key)))
+    elif isinstance(payload, list):
+        for index, value in enumerate(payload):
+            found.update(_flatten_numbers(value, f"{prefix}.{index}" if prefix else str(index)))
+    elif isinstance(payload, str):
+        # Many device APIs return the value as a numeric string, e.g. {"value": "231.4"}.
+        try:
+            number = float(payload.strip())
+        except (ValueError, AttributeError):
+            return found
+        if prefix:
+            found[prefix] = number
+    return found
+
+
 def poll_rest(config: dict) -> dict:
     """Poll a REST endpoint once and return {timestamp, metrics, codes, raw}.
 
@@ -90,10 +116,30 @@ def poll_rest(config: dict) -> dict:
                 pass
 
     metrics: dict[str, float] = {}
-    for metric, path in (config.get("field_map") or {}).items():
-        value = _dig(payload, path)
-        if isinstance(value, (int, float)):
-            metrics[metric] = float(value)
+    field_map = config.get("field_map") or {}
+    if field_map:
+        for metric, path in field_map.items():
+            value = _dig(payload, path)
+            if isinstance(value, (int, float)) and not isinstance(value, bool):
+                metrics[metric] = float(value)
+            elif isinstance(value, str):
+                try:
+                    metrics[metric] = float(value.strip())
+                except (ValueError, AttributeError):
+                    pass
+    else:
+        # No explicit mapping yet: auto-discover numeric values so the feed isn't empty.
+        if isinstance(payload, bool):
+            metrics = {}
+        elif isinstance(payload, (int, float)):
+            metrics = {"value": float(payload)}
+        elif isinstance(payload, str):
+            try:
+                metrics = {"value": float(payload.strip())}
+            except (ValueError, AttributeError):
+                metrics = {}
+        else:
+            metrics = _flatten_numbers(payload)
     codes = []
     if config.get("event_path"):
         raw_codes = _dig(payload, config["event_path"])

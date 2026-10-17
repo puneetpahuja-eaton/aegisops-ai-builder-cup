@@ -226,6 +226,29 @@ class LiveAdapterTests(PlatformTestBase):
                                        "verify_tls": False, "field_map": {"m": "v"}})
         self.assertIs(captured.get("verify"), False)
 
+    def test_poll_rest_auto_extracts_numeric_without_map(self):
+        for payload, expected_key, expected_val in [
+            ({"value": 231.4}, "value", 231.4),
+            ({"value": "231.4"}, "value", 231.4),
+            (231.4, "value", 231.4),
+            ("231.4", "value", 231.4),
+            ({"data": {"voltage": 480, "name": "x"}}, "data.voltage", 480.0),
+        ]:
+            class FakeResponse:
+                def __init__(self, p):
+                    self._p = p
+
+                def raise_for_status(self):
+                    return None
+
+                def json(self):
+                    return self._p
+
+            with patch("live.rest_adapter.requests.get", return_value=FakeResponse(payload)):
+                reading = rest_adapter.poll("rest", {"endpoint": "https://x", "auth_mode": "none"})
+            self.assertIn(expected_key, reading["metrics"], payload)
+            self.assertEqual(reading["metrics"][expected_key], expected_val)
+
     def test_poll_rest_digest_auth(self):
         payload = {"v": 1.0}
 
