@@ -201,7 +201,18 @@ class InferenceAndIntegrationParsers(PlatformTestBase):
         with self.assertRaises(ValueError):
             github.parse_repo("justone")
 
-    def test_github_text_path_matching(self):
+    def test_github_ingest_reports_progress(self):
+        device = devices.create_device(name="D", type="METER")
+        files = [{"path": f"src/f{i}.c", "sha": f"sha{i}", "size": 100} for i in range(5)]
+        calls = []
+        with patch("integrations.github._default_branch", return_value="main"), \
+             patch("integrations.github._list_files", return_value=(files, False, 5)), \
+             patch("integrations.github._fetch_blob", side_effect=lambda o, r, s: "register map voltage " * 30):
+            result = github.ingest_repo(device["id"], "o/r",
+                                        on_progress=lambda done, total, label: calls.append((done, total)))
+        self.assertEqual(result["files"], 5)
+        self.assertEqual(calls[-1], (5, 5))
+        self.assertEqual(ingest.corpus_size(device["id"]), result["chunks"])
         for path in ("src/main.c", "inc/driver.hpp", "CMakeLists.txt", "Makefile",
                      "docs/readme.md", "build/toolchain.cmake", "data/registers.csv", "Dockerfile"):
             self.assertTrue(github._is_text_path(path), path)
@@ -233,9 +244,11 @@ class DeviceDataTests(PlatformTestBase):
         self.assertIsNone(device_data.get_dataset(device["id"]))
 
 
-def _fake_repo_ingest(device_id, ref, branch, link_id=None):
+def _fake_repo_ingest(device_id, ref, branch, link_id=None, on_progress=None):
     ingest.ingest_text(device_id, name=f"github:{ref}/f1", kind="github",
                        text="voltage and current register map " * 40, link_id=link_id)
+    if on_progress:
+        on_progress(1, 1, "f1")
     return {"files": 1, "chunks": 1, "repo": ref, "branch": "main",
             "matched": 1, "capped": False, "tree_truncated": False}
 

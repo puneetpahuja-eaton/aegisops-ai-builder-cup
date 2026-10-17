@@ -95,6 +95,26 @@ def set_doc(collection: str, doc_id: str, data: dict) -> None:
         _save_local(db)
 
 
+def set_docs(collection: str, items: dict[str, dict]) -> None:
+    """Write many documents in one batch (far fewer local-store rewrites / Firestore calls)."""
+    if not items:
+        return
+    if is_firestore():
+        client = _fs_client()
+        collection_ref = _fs_collection(collection)
+        pending = list(items.items())
+        for start in range(0, len(pending), 450):  # Firestore batch limit is 500 ops.
+            batch = client.batch()
+            for doc_id, data in pending[start:start + 450]:
+                batch.set(collection_ref.document(doc_id), data)
+            batch.commit()
+        return
+    with _LOCK:
+        db = _load_local()
+        db.setdefault(collection, {}).update(items)
+        _save_local(db)
+
+
 def update_doc(collection: str, doc_id: str, data: dict) -> None:
     if is_firestore():
         _fs_collection(collection).document(doc_id).set(data, merge=True)

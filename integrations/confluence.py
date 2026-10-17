@@ -51,7 +51,9 @@ def _html_to_text(html: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-def ingest_page(device_id: str, page_ref: str, link_id: str | None = None) -> dict:
+def ingest_page(device_id: str, page_ref: str, link_id: str | None = None, on_progress=None) -> dict:
+    if on_progress:
+        on_progress(0, 1, "fetching page")
     base, email, api_token = _config()
     page_id = page_id_from(page_ref)
     url = f"{base}/wiki/rest/api/content/{page_id}?expand=body.storage,title"
@@ -72,4 +74,6 @@ def ingest_page(device_id: str, page_ref: str, link_id: str | None = None) -> di
         raise ValueError("The Confluence page returned no readable content.")
     record = ingest.ingest_text(device_id, name=f"confluence:{title}", kind="confluence", text=text,
                                 link_id=link_id)
+    if on_progress:
+        on_progress(1, 1, title)
     return {"title": title, "chunks": record["chunk_count"], "page_id": page_id}

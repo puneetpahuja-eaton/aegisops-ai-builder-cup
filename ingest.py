@@ -142,12 +142,14 @@ def ingest_text(device_id: str, *, name: str, kind: str, text: str, gcs_uri: str
         raise ValueError("No extractable text found in this source.")
     embeddings = embed_texts(chunks)
     source_id = uuid.uuid4().hex
-    chunks_collection = devices.chunks_path(device_id)
-    for index, (chunk, embedding) in enumerate(zip(chunks, embeddings)):
-        datastore.set_doc(chunks_collection, f"{source_id}-{index}", {
+    chunk_docs = {
+        f"{source_id}-{index}": {
             "source_id": source_id, "source_name": name, "kind": kind, "link_id": link_id,
             "index": index, "text": chunk, "embedding": embedding,
-        })
+        }
+        for index, (chunk, embedding) in enumerate(zip(chunks, embeddings))
+    }
+    datastore.set_docs(devices.chunks_path(device_id), chunk_docs)
     record = {
         "id": source_id, "name": name, "kind": kind, "gcs_uri": gcs_uri, "link_id": link_id,
         "chunk_count": len(chunks), "char_count": len(text), "ingested_at": _now(), "status": "ready",

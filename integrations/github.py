@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
@@ -106,23 +107,33 @@ def parse_repo(repo_ref: str) -> tuple[str, str]:
 
 
 def ingest_repo(device_id: str, repo_ref: str, branch: str | None = None,
-                link_id: str | None = None) -> dict:
+                link_id: str | None = None, on_progress=None) -> dict:
     owner, repo = parse_repo(repo_ref)
     branch = branch or _default_branch(owner, repo)
     files, truncated, matched = _list_files(owner, repo, branch)
     if not files:
         raise ValueError("No ingestible text files found in that repository.")
-    ingested, chunks = 0, 0
-    for item in files:
+    total = len(files)
+    if on_progress:
+        on_progress(0, total, "listing files")
+
+    def _fetch(item: dict) -> tuple[dict, str | None]:
         try:
-            text = _fetch_blob(owner, repo, item["sha"])
+            return item, _fetch_blob(owner, repo, item["sha"])
         except requests.RequestException:
-            continue
-        if not text.strip():
-            continue
-        record = ingest.ingest_text(device_id, name=f"github:{owner}/{repo}/{item['path']}",
-                                    kind="github", text=text, link_id=link_id)
-        ingested += 1
-        chunks += record["chunk_count"]
+            return item, None
+
+    ingested, chunks, done = 0, 0, 0
+    # Fetch blobs concurrently (network-bound); embed/store sequentially (thread-safe).
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        for item, text in pool.map(_fetch, files):
+            done += 1
+            if text and text.strip():
+                record = ingest.ingest_text(device_id, name=f"github:{owner}/{repo}/{item['path']}",
+                                            kind="github", text=text, link_id=link_id)
+                ingested += 1
+                chunks += record["chunk_count"]
+            if on_progress:
+                on_progress(done, total, item["path"])
     return {"files": ingested, "chunks": chunks, "repo": f"{owner}/{repo}", "branch": branch,
             "matched": matched, "capped": matched > len(files), "tree_truncated": truncated}

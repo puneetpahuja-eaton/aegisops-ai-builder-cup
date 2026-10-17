@@ -41,10 +41,11 @@ def _save_link(device_id: str, link_id: str, kind: str, ref: str, result: dict) 
     })
 
 
-def add_or_refresh(device_id: str, kind: str, ref: str, branch: str | None = None) -> dict:
+def add_or_refresh(device_id: str, kind: str, ref: str, branch: str | None = None, on_progress=None) -> dict:
     """Ingest a GitHub repo or Confluence page and register it for persistence.
 
     Refreshes any prior ingestion of the same link so chunks are current, not duplicated.
+    `on_progress(done, total, label)` is called during ingestion for a progress bar.
     """
     if kind not in LINK_KINDS:
         raise ValueError("Unsupported link kind.")
@@ -52,9 +53,9 @@ def add_or_refresh(device_id: str, kind: str, ref: str, branch: str | None = Non
     link_id = _link_id(kind, ref if kind == "confluence" else ref)
     ingest.delete_by_link(device_id, link_id)
     if kind == "github":
-        result = github.ingest_repo(device_id, ref, branch, link_id=link_id)
+        result = github.ingest_repo(device_id, ref, branch, link_id=link_id, on_progress=on_progress)
     else:
-        result = confluence.ingest_page(device_id, ref, link_id=link_id)
+        result = confluence.ingest_page(device_id, ref, link_id=link_id, on_progress=on_progress)
     _save_link(device_id, link_id, kind, ref, result)
     return result
 

@@ -58,19 +58,27 @@ def render() -> None:
         repo = st.text_input("owner/repo or URL", key="gh_repo", placeholder="eaton/prism-firmware")
         branch = st.text_input("Branch (optional)", key="gh_branch")
         if st.button("Ingest & save repository", disabled=not repo):
-            with st.spinner("Fetching and embedding repository files..."):
-                try:
-                    result = knowledge.add_or_refresh(device_id, "github", repo, branch or None)
-                except Exception as error:  # noqa: BLE001
-                    st.error(str(error))
-                else:
-                    st.success(f"Ingested {result['files']} of {result['matched']} matching files "
-                               f"({result['chunks']} chunks) from {result['repo']}@{result['branch']}. Saved.")
-                    if result.get("capped"):
-                        st.warning(f"Only the first {result['files']} files were ingested (cap).")
-                    if result.get("tree_truncated"):
-                        st.warning("GitHub truncated the file tree (very large repo); some paths were not listed.")
-                    st.rerun()
+            bar = st.progress(0.0, "Starting…")
+
+            def _on_progress(done: int, total: int, label: str) -> None:
+                frac = (done / total) if total else 1.0
+                bar.progress(min(frac, 1.0), f"Embedding {done}/{total}: {label[-60:]}")
+
+            try:
+                result = knowledge.add_or_refresh(device_id, "github", repo, branch or None,
+                                                  on_progress=_on_progress)
+            except Exception as error:  # noqa: BLE001
+                bar.empty()
+                st.error(str(error))
+            else:
+                bar.progress(1.0, "Done")
+                st.success(f"Ingested {result['files']} of {result['matched']} matching files "
+                           f"({result['chunks']} chunks) from {result['repo']}@{result['branch']}. Saved.")
+                if result.get("capped"):
+                    st.warning(f"Only the first {result['files']} files were ingested (cap).")
+                if result.get("tree_truncated"):
+                    st.warning("GitHub truncated the file tree (very large repo); some paths were not listed.")
+                st.rerun()
     with col2:
         st.subheader("Confluence page")
         page = st.text_input("Page ID or URL", key="cf_page")
@@ -104,13 +112,20 @@ def render() -> None:
         cols[1].write(f"{link.get('chunk_count', 0)} chunks")
         cols[2].caption(f"Updated: {str(link.get('last_ingested', ''))[:19]}")
         if cols[3].button("Refresh", key=f"refresh_{link['id']}"):
-            with st.spinner("Refreshing..."):
-                try:
-                    knowledge.add_or_refresh(device_id, link["kind"], link["ref"])
-                except Exception as error:  # noqa: BLE001
-                    st.error(str(error))
-                else:
-                    st.rerun()
+            bar = st.progress(0.0, "Refreshing…")
+
+            def _rp(done: int, total: int, label: str, _bar=bar) -> None:
+                frac = (done / total) if total else 1.0
+                _bar.progress(min(frac, 1.0), f"Embedding {done}/{total}: {label[-60:]}")
+
+            try:
+                knowledge.add_or_refresh(device_id, link["kind"], link["ref"], on_progress=_rp)
+            except Exception as error:  # noqa: BLE001
+                bar.empty()
+                st.error(str(error))
+            else:
+                bar.progress(1.0, "Done")
+                st.rerun()
         if cols[4].button("Remove", key=f"rmlink_{link['id']}"):
             knowledge.delete_link(device_id, link["id"])
             st.rerun()
