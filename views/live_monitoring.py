@@ -1,6 +1,8 @@
 """Engineer/Admin: live REST monitoring with real-time agentic analysis."""
 from __future__ import annotations
 
+import re
+
 import pandas as pd
 import streamlit as st
 
@@ -37,14 +39,19 @@ def _render_config(device: dict) -> dict:
     simulated = st.toggle("Use built-in simulated feed (no device needed)",
                           value=config.get("simulated", True),
                           help="Great for the demo. Turn off to poll a real REST endpoint.")
-    endpoint = st.text_input("REST endpoint", value=config.get("endpoint", ""), disabled=simulated,
+    endpoint = st.text_input("REST endpoint (base — the param ID in the path is the template)",
+                             value=config.get("endpoint", ""), disabled=simulated,
                              placeholder="https://10.130.178.92/rs/param/22120/value")
-    param_ids_text = st.text_input(
-        "Parameter IDs to monitor (comma-separated, optional)", disabled=simulated,
-        value=", ".join(str(p) for p in (config.get("param_ids") or [])),
-        help="For /rs/param/<id>/value devices: list all param IDs, e.g. 22120, 22121, 22130. "
-             "Each is polled every interval and its value is tracked. Leave blank to poll just the endpoint.")
-    param_ids = [p.strip() for p in param_ids_text.split(",") if p.strip()]
+    param_ids_text = st.text_area(
+        "Parameter IDs to monitor", disabled=simulated, height=90,
+        value="\n".join(str(p) for p in (config.get("param_ids") or [])),
+        help="One per line (or comma-separated). The agent polls /rs/param/<id>/value for each and "
+             "tracks its value. The ID already in the endpoint is always included.",
+        placeholder="22120\n22121\n22130\n22140")
+    param_ids = [p.strip() for p in re.split(r"[,\n]", param_ids_text) if p.strip()]
+    if not simulated and param_ids:
+        st.caption(f"Monitoring **{len(param_ids)}** parameter(s): {', '.join(param_ids[:20])}"
+                   + (" …" if len(param_ids) > 20 else "") + ". Only each param's `value` is tracked.")
     hex_as_float = st.selectbox(
         "Hex value format", ["IEEE-754 float (32-bit)", "Unsigned integer"],
         index=0 if config.get("hex_as_float", True) else 1, disabled=simulated,

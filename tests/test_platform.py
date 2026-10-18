@@ -240,14 +240,14 @@ class LiveAdapterTests(PlatformTestBase):
         # 0x41F00000 == 30.0, 0x3F800000 == 1.0 in IEEE-754 float32.
         with patch("live.rest_adapter.requests.get",
                    return_value=FakeResponse({"pid": 1, "value": "0x41F00000,0x3F800000"})):
-            reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/1/value",
+            reading = rest_adapter.poll("rest", {"endpoint": "https://x/api/telemetry",
                                                  "auth_mode": "none", "hex_as_float": True})
         self.assertAlmostEqual(reading["metrics"]["value.0"], 30.0, places=4)
         self.assertAlmostEqual(reading["metrics"]["value.1"], 1.0, places=4)
         # Zero stays zero either way.
         with patch("live.rest_adapter.requests.get",
                    return_value=FakeResponse({"pid": 1, "value": "0x00000000"})):
-            reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/1/value",
+            reading = rest_adapter.poll("rest", {"endpoint": "https://x/api/telemetry",
                                                  "auth_mode": "none", "hex_as_float": True})
         self.assertEqual(reading["metrics"]["value"], 0.0)
 
@@ -264,7 +264,7 @@ class LiveAdapterTests(PlatformTestBase):
 
         with patch("live.rest_adapter.requests.get",
                    return_value=FakeResponse({"pid": 22120, "value": "0x0000000A,0x00000000,0x000000FF"})):
-            reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/22120/value", "auth_mode": "none"})
+            reading = rest_adapter.poll("rest", {"endpoint": "https://x/api/telemetry", "auth_mode": "none"})
         self.assertEqual(reading["metrics"]["value.0"], 10.0)
         self.assertEqual(reading["metrics"]["value.2"], 255.0)
 
@@ -289,10 +289,14 @@ class LiveAdapterTests(PlatformTestBase):
             return FakeResponse(responses[pid])
 
         with patch("live.rest_adapter.requests.get", side_effect=fake_get):
+            # Endpoint's own id (22120) auto-included; only 22121 listed explicitly.
             reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/22120/value",
-                                                 "auth_mode": "none", "param_ids": ["22120", "22121"]})
+                                                 "auth_mode": "none", "param_ids": ["22121"]})
         self.assertEqual(reading["metrics"]["p22120"], 10.0)
         self.assertEqual(reading["metrics"]["p22121"], 20.0)
+        # The echoed pid field is NOT tracked — only value.
+        self.assertNotIn("p22120.pid", reading["metrics"])
+        self.assertEqual(sorted(reading["metrics"]), ["p22120", "p22121"])
 
     def test_poll_rest_auto_extracts_numeric_without_map(self):
         for payload, expected_key, expected_val in [

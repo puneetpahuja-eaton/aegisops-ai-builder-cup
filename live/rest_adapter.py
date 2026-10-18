@@ -173,16 +173,19 @@ _PARAM_URL = re.compile(r"(/rs/param/)(\d+)(/value)")
 
 
 def poll_params(config: dict) -> dict:
-    """Poll several /rs/param/<id>/value endpoints and merge their values.
+    """Poll several /rs/param/<id>/value endpoints and merge their `value` fields.
 
-    config adds `param_ids` (list[str|int]); the endpoint's numeric param id is the
-    template. Each param's `value` is labeled `p<id>` (or `p<id>.<word>` for multi-word
-    hex). The combined raw map is returned for inspection.
+    config adds `param_ids` (list[str|int]); the endpoint's own param id is always
+    included. Only each response's `value` field is tracked (the `pid` echo is ignored),
+    labeled `p<id>` (or `p<id>.<word>` for multi-word values).
     """
-    param_ids = [str(pid).strip() for pid in config.get("param_ids") or [] if str(pid).strip()]
     endpoint = config["endpoint"]
-    if not param_ids or not _PARAM_URL.search(endpoint):
+    match = _PARAM_URL.search(endpoint)
+    if not match:
         return poll_rest(config)
+    param_ids = [str(pid).strip() for pid in config.get("param_ids") or [] if str(pid).strip()]
+    # Always include the id already in the endpoint, de-duplicated and order-preserving.
+    param_ids = list(dict.fromkeys([match.group(2), *param_ids]))
 
     merged: dict[str, float] = {}
     raw: dict[str, Any] = {}
@@ -190,13 +193,14 @@ def poll_params(config: dict) -> dict:
     for pid in param_ids:
         url = _PARAM_URL.sub(lambda m: f"{m.group(1)}{pid}{m.group(3)}", endpoint)
         try:
-            reading = poll_rest({**config, "endpoint": url, "field_map": None})
+            # Monitor only the `value` field; ignore the echoed pid and other fields.
+            reading = poll_rest({**config, "endpoint": url, "field_map": {"value": "value"}})
         except Exception as error:  # noqa: BLE001
             errors.append(f"param {pid}: {error}")
             continue
         raw[pid] = reading.get("raw")
         for key, value in reading["metrics"].items():
-            label = f"p{pid}" if key == "value" else f"p{pid}.{key}"
+            label = f"p{pid}" if key == "value" else f"p{pid}.{key.split('.', 1)[-1]}"
             merged[label] = value
     if not merged and errors:
         raise RuntimeError("; ".join(errors[:4]))
@@ -209,6 +213,6 @@ def poll_params(config: dict) -> dict:
 def poll(protocol: str, config: dict) -> dict:
     if not ENABLED_PROTOCOLS.get(protocol, False):
         raise ProtocolDisabled(f"Protocol '{protocol}' is disabled in this edition. Use REST.")
-    if config.get("param_ids"):
+    if _PARAM_URL.search(config.get("endpoint", "")):
         return poll_params(config)
     return poll_rest(config)
