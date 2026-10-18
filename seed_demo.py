@@ -18,7 +18,7 @@ import devices
 from dataset_gen import AnomalySpec, AssetSpec, DatasetSpec, MetricSpec, build_dataset
 from fleet_data import FleetDataset
 
-_DEMO_MARKER = "kairos-demo-v1"
+_DEMO_MARKER = "kairos-demo-v2"
 _DEMO_ID = "demo-power-panel"
 _DEMO_NAME = "Demo - Power Distribution Panel"
 
@@ -70,14 +70,18 @@ def ensure_demo(force: bool = False) -> str | None:
     None if seeding is skipped or fails. Never raises, so it is safe at startup.
     """
     try:
-        strays = [d for d in devices.list_devices()
-                  if (d.get("metadata") or {}).get("demo") == _DEMO_MARKER and d.get("id") != _DEMO_ID]
-        for stray in strays:
-            try:
-                devices.delete_device(stray["id"])
-            except Exception:
-                pass
-        if not force and devices.get_device(_DEMO_ID):
+        current = devices.get_device(_DEMO_ID)
+        # Remove any demo device from an older version (different marker or stray id)
+        # so a changed demo regenerates with the latest dataset.
+        for d in devices.list_devices():
+            marker = (d.get("metadata") or {}).get("demo")
+            if marker and (marker != _DEMO_MARKER or d.get("id") != _DEMO_ID):
+                try:
+                    devices.delete_device(d["id"])
+                except Exception:
+                    pass
+        up_to_date = bool(current) and (current.get("metadata") or {}).get("demo") == _DEMO_MARKER
+        if not force and up_to_date:
             return _DEMO_ID
         now = datetime.datetime.now(datetime.timezone.utc).isoformat()
         record = {
