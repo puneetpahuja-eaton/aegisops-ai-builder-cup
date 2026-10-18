@@ -15,7 +15,7 @@ $Variables = "USE_VERTEX=1,USE_FIRESTORE=1,SEED_DEMO=1,GOOGLE_CLOUD_PROJECT=$Pro
     --build-service-account="projects/$Project/serviceAccounts/$($Config.build_account)" `
     --service-account=$($Config.service_account) --allow-unauthenticated `
     --set-env-vars=$Variables --memory=1Gi --cpu=1 --min-instances=0 `
-    --max-instances=4 --concurrency=8 --timeout=300 --port=8080 --quiet
+    --max-instances=4 --concurrency=8 --timeout=3600 --port=8080 --quiet
 if ($LASTEXITCODE -ne 0) { throw 'Cloud Run deployment failed.' }
 & $Python $Cli run services describe $Service --project=$Project --region=$Region --format='value(status.url)'
 if ($LASTEXITCODE -ne 0) { throw 'Could not retrieve Cloud Run URL.' }

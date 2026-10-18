@@ -54,11 +54,14 @@ def _batches(texts: list[str]):
         yield batch
 
 
-def embed_texts(texts: list[str]) -> list[list[float]]:
+def embed_texts(texts: list[str], on_progress=None) -> list[list[float]]:
     if not texts:
         return []
     if not is_live():
-        return [_offline_embed(text) for text in texts]
+        result = [_offline_embed(text) for text in texts]
+        if on_progress:
+            on_progress(len(result), len(texts))
+        return result
     from gemini_client import _client  # Reuse the configured Vertex/AI-Studio client.
     from google.genai import errors
 
@@ -76,6 +79,8 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
                         time.sleep(min(60, 8 * (attempt + 1)))  # Back off on quota/rate limits.
                         continue
                     raise
+            if on_progress:
+                on_progress(len(out), len(texts))
     return out
 
 

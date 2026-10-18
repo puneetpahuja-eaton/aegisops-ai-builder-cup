@@ -183,7 +183,12 @@ def ingest_many(device_id: str, items: list[dict], link_id: str | None = None, o
         start = len(all_chunks)
         all_chunks.extend(chunks)
         prepared.append((item, chunks, start, start + len(chunks)))
-    embeddings = embed_texts(all_chunks)
+
+    def _embed_cb(done: int, total: int) -> None:
+        if on_progress:
+            on_progress(done, total, f"embedding {done}/{total} chunks…")
+
+    embeddings = embed_texts(all_chunks, on_progress=_embed_cb)
 
     files, total_chunks = 0, 0
     chunks_collection = devices.chunks_path(device_id)
@@ -215,7 +220,7 @@ def ingest_many(device_id: str, items: list[dict], link_id: str | None = None, o
         files += 1
         total_chunks += len(chunks)
         if on_progress:
-            on_progress(index + 1, len(prepared), item["name"])
+            on_progress(index + 1, len(prepared), f"saving {item['name'].rsplit('/', 1)[-1]}")
     if files:
         devices.update_device(device_id, {"status": "ready"})
     return {"files": files, "chunks": total_chunks}

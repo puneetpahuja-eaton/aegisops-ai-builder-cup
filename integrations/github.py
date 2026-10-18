@@ -170,7 +170,7 @@ def ingest_items(device_id: str, owner: str, repo: str, items: list[dict], link_
 
     if on_progress and sources:
         on_progress(done, total, f"embedding {len(sources)} files…")
-    result = ingest.ingest_many(device_id, sources, link_id=link_id)
+    result = ingest.ingest_many(device_id, sources, link_id=link_id, on_progress=on_progress)
     return result["files"], result["chunks"]
 
 

@@ -304,13 +304,21 @@ python -m cloud.provision
 
 Provisioning seeds private GCS sources, configures dedicated build/runtime
 identities and a partitioned BigQuery table with 30-day retention.
-Runtime permissions: Vertex AI User and BigQuery Job User on the project,
-Object Viewer on the demo bucket, Writer on the audit dataset.
+Runtime permissions: Vertex AI User, BigQuery Job User, Firestore (Datastore)
+User and Secret Manager Accessor on the project, Object Admin on the demo bucket,
+Writer on the audit dataset.
 
-The demo scales to zero, limits Cloud Run to one instance, and bounds history
-queries to 10 MiB. This is not a spending cap; Vertex AI, builds, storage and
-hosting may incur charges. The billing-account owner still needs to configure
-budget alerts. This public hackathon demo is not a production multi-tenant system.
+On first visit the deployed app seeds a labeled demo device (`SEED_DEMO=1`) so
+Analysis is populated immediately — three synthetic assets with three disclosed
+ground-truth faults, scoring diagnosis accuracy, downtime avoided and cost
+avoided. The seed is race-safe (fixed id) and idempotent.
+
+Scale: Cloud Run is stateless (state lives in Firestore/GCS/BigQuery), so it
+scales horizontally; the service is configured to scale to zero up to four
+instances at concurrency eight, and history queries are bounded to 10 MiB. This
+is not a spending cap; Vertex AI, builds, storage and hosting may incur charges,
+and the billing-account owner still needs to configure budget alerts. This
+public hackathon demo is not a production multi-tenant system.
 
 ## Submission
 
