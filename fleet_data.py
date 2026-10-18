@@ -41,8 +41,8 @@ class Reading(Contract):
         if self.timestamp.utcoffset() is None:
             raise ValueError("Timestamps must include a timezone (for example +00:00).")
         self.timestamp = self.timestamp.astimezone(timezone.utc)
-        if not self.metrics or len(self.metrics) > 30:
-            raise ValueError("Each reading requires 1-30 numeric metrics.")
+        if not self.metrics or len(self.metrics) > 120:
+            raise ValueError("Each reading requires 1-120 numeric metrics.")
         if any(not key or len(key) > 80 for key in self.metrics):
             raise ValueError("Metric names must have 1-80 characters.")
         if any(key in {"timestamp", "asset_id"} or key.startswith("original_") for key in self.metrics):

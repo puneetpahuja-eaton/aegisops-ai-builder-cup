@@ -38,7 +38,7 @@ class AssetSpec(BaseModel):
     id: str = Field(description="Asset/device identifier")
     type: str = Field(default="METER")
     criticality: str = Field(default="medium")
-    metrics: list[MetricSpec] = Field(min_length=1, max_length=30)
+    metrics: list[MetricSpec] = Field(min_length=1, max_length=120)
 
 
 class AnomalySpec(BaseModel):
@@ -88,7 +88,8 @@ _SCHEMA_HINT = """Return ONLY a JSON object (no prose, no markdown fences) with 
   "notes": "assumptions here"
 }
 Rules: metric names are short snake_case; include unit and realistic normal_min/normal_max.
-anomaly kind is one of: spike, sag, drift, dropout. 1-10 assets, <=30 metrics each, 1-4 anomalies."""
+anomaly kind is one of: spike, sag, drift, dropout. 1-10 assets, up to 120 metrics each, 1-6 anomalies.
+Include every parameter the user asks for (per-phase and totals) as its own metric."""
 
 
 def _extract_json(text: str) -> dict:
@@ -300,7 +301,12 @@ def build_dataset(spec: DatasetSpec) -> FleetDataset:
                 if role == "voltage":
                     val = volts.get(mph, sum(volts.values()) / 3)
                 elif role == "current":
-                    val = amps.get(mph, sum(amps.values()) / 3)
+                    if "neutral" in m.name.lower():
+                        # Neutral current ~ small residual imbalance of the three phases.
+                        val = abs(amps["a"] - amps["b"]) * 0.3 + abs(amps["b"] - amps["c"]) * 0.3 \
+                            + (sum(amps.values()) / 3) * 0.05
+                    else:
+                        val = amps.get(mph, sum(amps.values()) / 3)
                 elif role == "power_factor":
                     val = pf
                 elif role == "active_power":
