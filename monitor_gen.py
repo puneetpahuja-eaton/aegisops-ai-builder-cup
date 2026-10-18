@@ -33,9 +33,11 @@ class MonitorParam(BaseModel):
 
 class EventLogSpec(BaseModel):
     pid: str = Field(default="", description="Parameter ID / endpoint that returns the event log")
-    format: str = Field(default="", description="How the event log is encoded (free text understanding)")
-    decode: str = Field(default="", description="Step-by-step decode instructions the poller can follow")
-    code_field: str = Field(default="", description="Where the event code/type lives in each entry")
+    format: str = Field(default="", description="How the event log is encoded (free-text understanding)")
+    decode: str = Field(default="", description="Step-by-step decode instructions, for the engineer")
+    word_index: int = Field(default=-1, description="0-based index of the hex word holding the event code (-1=unknown)")
+    code_map: dict[str, str] = Field(default_factory=dict,
+                                     description="Map raw code value (decimal or 0x hex string) -> event code name")
 
 
 class MonitorPlan(BaseModel):
@@ -54,12 +56,13 @@ _SCHEMA_HINT = """Return ONLY a JSON object (no prose, no fences) like:
     {"pid": "22120", "label": "Phase A voltage", "unit": "V", "lower": 210, "upper": 250, "path": ""}
   ],
   "event_log": {"pid": "40010", "format": "ring buffer of 32-bit words",
-                "decode": "each entry = timestamp(2 words) + code(1 word); code maps to event name",
-                "code_field": "word[2]"},
+                "decode": "each entry = timestamp(2 words) + code(1 word)",
+                "word_index": 2, "code_map": {"0x0001": "VOLT_SAG", "0x0002": "OVERLOAD_ALARM"}},
   "notes": "assumptions"
 }
-Use the referenced docs to resolve real parameter IDs and units. If the event log
-layout is unknown, leave event_log null rather than guessing."""
+Use the referenced docs to resolve real parameter IDs and units. For the event log,
+set word_index to the 0-based hex-word position of the event code and code_map to the
+raw-value -> event-name mapping. If the layout is unknown, leave event_log null."""
 
 
 def _context(device_id: str) -> str:

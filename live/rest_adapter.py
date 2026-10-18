@@ -215,9 +215,58 @@ def poll_params(config: dict) -> dict:
     }
 
 
+def decode_event_log(config: dict) -> list[str]:
+    """Poll the configured event-log parameter and decode it into event codes.
+
+    config["event_log"] = {pid, word_index, code_map}. Fetches /rs/param/<pid>/value
+    (comma-separated hex words), extracts the code word at word_index, and maps it
+    via code_map (keys may be decimal or 0x-hex). Returns [] if unknown/unmatched.
+    """
+    spec = config.get("event_log") or {}
+    pid = str(spec.get("pid", "")).strip()
+    endpoint = config.get("endpoint", "")
+    if not pid or not _PARAM_URL.search(endpoint):
+        return []
+    url = _PARAM_URL.sub(lambda m: f"{m.group(1)}{pid}{m.group(3)}", endpoint)
+    try:
+        reading = poll_rest({**config, "endpoint": url, "field_map": None, "param_ids": None})
+    except Exception:  # noqa: BLE001 - event log is best-effort; never break the main poll
+        return []
+    raw = reading.get("raw")
+    # Extract the raw hex-word string from the response value.
+    value = raw.get("value") if isinstance(raw, dict) else raw
+    if not isinstance(value, str):
+        return []
+    words = [w.strip() for w in value.split(",") if w.strip()]
+    word_index = int(spec.get("word_index", -1))
+    if word_index < 0 or word_index >= len(words):
+        return []
+    token = words[word_index]
+    try:
+        raw_int = int(token, 16) if token.lower().startswith("0x") else int(token)
+    except ValueError:
+        return []
+    code_map = spec.get("code_map") or {}
+    # Match the code by decimal or normalized-hex key.
+    for key, name in code_map.items():
+        try:
+            key_int = int(key, 16) if str(key).lower().startswith("0x") else int(key)
+        except ValueError:
+            continue
+        if key_int == raw_int and name:
+            return [name]
+    return []
+
+
 def poll(protocol: str, config: dict) -> dict:
     if not ENABLED_PROTOCOLS.get(protocol, False):
         raise ProtocolDisabled(f"Protocol '{protocol}' is disabled in this edition. Use REST.")
     if _PARAM_URL.search(config.get("endpoint", "")):
-        return poll_params(config)
-    return poll_rest(config)
+        reading = poll_params(config)
+    else:
+        reading = poll_rest(config)
+    if config.get("event_log"):
+        codes = decode_event_log(config)
+        if codes:
+            reading["codes"] = sorted(set(reading.get("codes", []) + codes))
+    return reading

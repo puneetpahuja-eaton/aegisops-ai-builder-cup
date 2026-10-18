@@ -86,6 +86,45 @@ def _plan_reference(device_id: str, ref_path: str) -> str:
     return knowledge.fetch_repo_file_text(device_id, ref_path.strip())["text"]
 
 
+def _render_prism_live(device_id: str, prism_key: str) -> None:
+    """Render the live PRISM five-agent engine results (same engine as Analysis)."""
+    prism = st.session_state.get(prism_key)
+    if prism is None:
+        return
+    st.divider()
+    st.subheader("🧠 PRISM five-agent analysis (live)")
+    if prism.status == "warming":
+        collected = len(prism._warmup_readings)
+        needed = prism.warmup + 1
+        st.progress(min(collected / needed, 1.0),
+                    f"Learning the healthy baseline… {collected}/{needed} readings")
+        st.caption("Once the baseline is established, each poll streams through the PRISM agents.")
+        return
+    summary = prism.summary() or {}
+    cols = st.columns(5)
+    cols[0].metric("Cases", summary.get("total_cases", 0))
+    cols[1].metric("Auto-resolved", summary.get("auto_resolved", 0))
+    cols[2].metric("Escalated", summary.get("escalated", 0))
+    acc = summary.get("diagnosis_accuracy")
+    cols[3].metric("Diagnosis acc.", f"{acc * 100:.0f}%" if acc is not None else "n/a")
+    cols[4].metric("Cost avoided (est.)", f"${summary.get('cost_avoided_usd', 0):,.0f}")
+    st.caption(f"Downtime avoided (estimated): {summary.get('downtime_avoided_min', 0)} min · "
+               "live field data has no ground truth, so accuracy is n/a and value is an estimate.")
+    audit = prism.audit() or {}
+    cases = audit.get("cases", [])
+    if cases:
+        st.dataframe([{"case": c.get("case_id"), "asset": c.get("root_asset_id"),
+                       "fault": c.get("fault_type"), "decision": c.get("decision"),
+                       "status": c.get("status"), "confidence": round(c.get("confidence", 0), 2)}
+                      for c in reversed(cases)], hide_index=True, width="stretch")
+    trace = audit.get("log", [])[-8:]
+    if trace:
+        with st.expander("Agent reasoning trace (live)"):
+            st.dataframe([{"agent": e.get("agent"), "case": e.get("case_id"), "detail": e.get("message")}
+                          for e in reversed(trace)], hide_index=True, width="stretch")
+
+
+
 
 def _config_key(device_id: str) -> str:
     return f"live_cfg_{device_id}"
@@ -303,11 +342,24 @@ def render() -> None:
     hist_key = f"live_hist_{device_id}"
     on_key = f"live_on_{device_id}"
     st.session_state.setdefault(on_key, False)
+    prism_key = f"live_prism_{device_id}"
+    deep = st.checkbox("🧠 Deep analysis (run the PRISM five-agent engine live)",
+                       value=st.session_state.get(f"live_deep_{device_id}", False),
+                       key=f"live_deep_{device_id}",
+                       help="Warms up on a healthy baseline, then streams each poll through the same engine "
+                            "the Analysis page uses — cases, diagnosis, estimated downtime/cost avoided.")
 
     col1, col2, col3 = st.columns(3)
     if col1.button("▶ Start", type="primary", disabled=st.session_state[on_key]):
         st.session_state[mon_key] = LiveMonitor(criticality=device["criticality"],
                                                 thresholds=config.get("thresholds") or {})
+        if deep:
+            from live_engine import LiveFleetEngine
+            st.session_state[prism_key] = LiveFleetEngine(
+                asset_id=device["name"] or device_id, criticality=device["criticality"],
+                offline=config.get("simulated", True) or st.session_state.get("prism_offline", False))
+        else:
+            st.session_state.pop(prism_key, None)
         st.session_state[hist_key] = []
         st.session_state[f"live_step_{device_id}"] = 0
         st.session_state[on_key] = True
@@ -316,7 +368,7 @@ def render() -> None:
         st.session_state[on_key] = False
         st.rerun()
     if col3.button("🔄 Reset"):
-        for key in (mon_key, hist_key, on_key):
+        for key in (mon_key, hist_key, on_key, prism_key):
             st.session_state.pop(key, None)
         st.rerun()
 
@@ -349,6 +401,12 @@ def render() -> None:
             st.session_state[hist_key] = st.session_state[hist_key][-120:]
             st.session_state[f"live_lastraw_{device_id}"] = reading.get("raw")
             st.session_state[f"live_lastmetrics_{device_id}"] = reading.get("metrics")
+            prism = st.session_state.get(prism_key)
+            if prism is not None:
+                try:
+                    prism.observe(reading)
+                except Exception as error:  # noqa: BLE001
+                    st.session_state[f"live_prism_err_{device_id}"] = str(error)
 
         summary = monitor.summary()
         metric_cols = st.columns(5)
@@ -359,6 +417,8 @@ def render() -> None:
         metric_cols[4].metric("Cost avoided (est.)", f"${summary['cost_avoided_usd']:,.0f}")
         st.caption(f"Downtime avoided (estimated): {summary['downtime_avoided_min']} min · "
                    "estimates only, not measured savings.")
+
+        _render_prism_live(device_id, prism_key)
 
         history = st.session_state.get(hist_key, [])
         last_metrics = st.session_state.get(f"live_lastmetrics_{device_id}")

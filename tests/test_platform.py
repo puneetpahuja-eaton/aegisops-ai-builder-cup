@@ -719,6 +719,75 @@ class DatasetGenTests(PlatformTestBase):
             self.assertAlmostEqual(pf, p / s if s else 0, delta=0.03)
             self.assertAlmostEqual(s, math.sqrt(p * p + q * q), delta=max(5.0, 0.02 * s))
 
+class LiveEngineTests(PlatformTestBase):
+    def test_live_engine_warms_up_then_detects(self):
+        import datetime
+        from live_engine import LiveFleetEngine
+        eng = LiveFleetEngine(asset_id="METER-1", criticality="high", offline=True, warmup=20)
+        base = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        out = {}
+        for i in range(21):
+            out = eng.observe({"timestamp": (base + datetime.timedelta(minutes=5 * i)).isoformat(),
+                               "metrics": {"p22120": 230.0 + (i % 3) * 0.2, "p22121": 50.0}, "codes": ["OK"]})
+        self.assertEqual(out["status"], "live")  # warmup complete
+        for i in range(21, 40):
+            anomaly = i >= 28
+            eng.observe({"timestamp": (base + datetime.timedelta(minutes=5 * i)).isoformat(),
+                         "metrics": {"p22120": 195.0 if anomaly else 230.0, "p22121": 50.0},
+                         "codes": ["VOLT_SAG"] if anomaly else ["OK"]})
+        summary = eng.summary()
+        self.assertGreaterEqual(summary["total_cases"], 1)
+        audit = eng.audit()
+        self.assertTrue(any(c["fault_type"] == "VOLTAGE_SAG" for c in audit["cases"]))
+
+    def test_live_engine_carries_forward_missing_metric(self):
+        import datetime
+        from live_engine import LiveFleetEngine
+        eng = LiveFleetEngine(asset_id="M", offline=True, warmup=20)
+        base = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        for i in range(21):
+            eng.observe({"timestamp": (base + datetime.timedelta(minutes=5 * i)).isoformat(),
+                         "metrics": {"p1": 10.0, "p2": 20.0}, "codes": ["OK"]})
+        # A poll that dropped p2 should not crash; p2 carries forward.
+        out = eng.observe({"timestamp": (base + datetime.timedelta(minutes=5 * 21)).isoformat(),
+                           "metrics": {"p1": 11.0}, "codes": ["OK"]})
+        self.assertEqual(out["status"], "live")
+
+
+class EventLogDecodeTests(PlatformTestBase):
+    def test_decode_event_log_maps_code(self):
+        from live import rest_adapter
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"pid": 40010, "value": "0x00000000,0x00000000,0x00000002"}
+
+        config = {"endpoint": "https://x/rs/param/22120/value", "auth_mode": "none",
+                  "event_log": {"pid": "40010", "word_index": 2,
+                                "code_map": {"0x0001": "VOLT_SAG", "0x0002": "OVERLOAD_ALARM"}}}
+        with patch("live.rest_adapter.requests.get", return_value=FakeResponse()):
+            codes = rest_adapter.decode_event_log(config)
+        self.assertEqual(codes, ["OVERLOAD_ALARM"])
+
+    def test_decode_event_log_unknown_returns_empty(self):
+        from live import rest_adapter
+
+        class FakeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {"pid": 40010, "value": "0x00000000,0x00000000,0x00000099"}
+
+        config = {"endpoint": "https://x/rs/param/22120/value", "auth_mode": "none",
+                  "event_log": {"pid": "40010", "word_index": 2, "code_map": {"0x0001": "VOLT_SAG"}}}
+        with patch("live.rest_adapter.requests.get", return_value=FakeResponse()):
+            self.assertEqual(rest_adapter.decode_event_log(config), [])
+
+
 class MonitorGenTests(PlatformTestBase):
     def test_plan_to_config_maps_params_and_event_log(self):
         import monitor_gen

@@ -118,6 +118,12 @@ class ReplaySource:
                 for row in data.telemetry if row.timestamp == timestamp
             }
 
+    def append_frame(self, frame: dict) -> int:
+        """Append a new live frame; returns its index. Enables streaming replay."""
+        index = len(self.frames)
+        self.frames[index] = frame
+        return index
+
     def sample_fleet(self, abs_idx, live_idx, active):
         # Each caller receives an independent snapshot; no simulator mutations.
         import copy
@@ -130,6 +136,7 @@ class Engine(ReferenceEngine):
         self.source = "uploaded" if dataset is not None else "synthetic"
         self.dataset = dataset.model_copy(deep=True) if dataset is not None else None
         self.labeled = True  # synthetic or ground-truth-generated data can score accuracy/value
+        self.credit_value = False  # live monitoring credits estimated early-detection value
         self.on_event = None
         self.sop = storage.load_text("sop.md")
         if self.dataset is None:
@@ -201,8 +208,24 @@ class Engine(ReferenceEngine):
     def timestamp(self, live_idx):
         if self.dataset is None:
             return super().timestamp(live_idx)
+        if getattr(self, "_live_timestamps", None):
+            return self._live_timestamps[live_idx]
         timestamps = sorted({row.timestamp for row in self.dataset.telemetry})
         return timestamps[live_idx]
+
+    def append_live(self, frame: dict, timestamp) -> int:
+        """Append a streamed live frame and extend the replay window by one tick.
+
+        `frame` is {asset_id: {metrics, codes, primary_code}}. Used by live
+        monitoring so the SAME PRISM engine analyzes a growing stream.
+        """
+        if not hasattr(self, "_live_timestamps"):
+            # Seed from the initial telemetry timestamps so indices stay aligned.
+            self._live_timestamps = sorted({row.timestamp for row in self.dataset.telemetry})
+        index = self.signal.append_frame(frame)
+        self._live_timestamps.append(timestamp)
+        self.total_samples = len(self.signal.frames)
+        return index
 
     def enrich(self, case, bb) -> None:
         asset = self.topo.get(case.root_asset_id)
@@ -257,7 +280,7 @@ class Engine(ReferenceEngine):
         self.on_event = on_event
         try:
             super().tick()
-            if self.source == "uploaded" and not self.labeled:
+            if self.source == "uploaded" and not self.labeled and not self.credit_value:
                 # Real uploaded field data has no measured intervention/counterfactual.
                 for case in self.cases:
                     case.downtime_avoided_min = 0
