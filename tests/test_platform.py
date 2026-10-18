@@ -154,6 +154,36 @@ class RagTests(PlatformTestBase):
         result = rag.answer(device["id"], "anything")
         self.assertFalse(result["grounded"])
 
+    def test_extract_artifacts_from_fenced_blocks(self):
+        text = ("Here is your dataset.\n```csv\ntimestamp,voltage,current\n2026-01-01,230,5\n"
+                "2026-01-02,231,5.1\n```\nAnd a test file:\n```json\n{\"cases\": [1, 2, 3, 4, 5]}\n```")
+        artifacts = rag._extract_artifacts(text)
+        self.assertEqual(len(artifacts), 2)
+        self.assertEqual(artifacts[0]["mime"], "text/csv")
+        self.assertTrue(artifacts[0]["name"].endswith(".csv"))
+        self.assertIn("voltage", artifacts[0]["content"])
+        self.assertEqual(artifacts[1]["mime"], "application/json")
+
+    def test_extract_artifacts_handles_unclosed_fence(self):
+        # Simulates a long dataset truncated at the output limit (no closing ```).
+        text = "Here is the dataset:\n```csv\nts,v,i\n1,230,5\n2,231,5\n3,229,5\n4,230,5\n5,232,5"
+        artifacts = rag._extract_artifacts(text)
+        self.assertEqual(len(artifacts), 1)
+        self.assertEqual(artifacts[0]["lang"], "csv")
+        self.assertTrue(artifacts[0].get("truncated"))
+        self.assertIn("231", artifacts[0]["content"])
+
+    def test_assist_generates_and_extracts_artifact(self):
+        device = devices.create_device(name="Meter", type="METER")
+        ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage and current info " * 40)
+        fake = "Synthetic dataset below.\n```csv\nts,v,i\n1,230,5\n2,231,5\n3,229,5\n```"
+        with patch("rag.is_live", return_value=True), \
+             patch("rag.generate_text", return_value=fake):
+            result = rag.assist(device["id"], "create a historic dataset")
+        self.assertEqual(len(result["artifacts"]), 1)
+        self.assertEqual(result["artifacts"][0]["lang"], "csv")
+        self.assertIn("Synthetic dataset", result["answer"])
+
 
 class LiveMonitorTests(PlatformTestBase):
     def test_detects_escalates_and_auto_resolves(self):
