@@ -702,6 +702,20 @@ class DatasetGenTests(PlatformTestBase):
         self.assertLessEqual(len(dataset.history), 20_000)
         self.assertLessEqual(len(dataset.telemetry), 10_000)
 
+    def test_generate_spec_parses_text_json(self):
+        import dataset_gen
+        model_text = ("Here is the spec:\n```json\n{\"assets\": [{\"id\": \"M1\", \"type\": \"METER\", "
+                      "\"criticality\": \"high\", \"metrics\": [{\"name\": \"v_a\", \"unit\": \"V\", "
+                      "\"normal_min\": 220, \"normal_max\": 240}]}], \"sample_interval_min\": 5, "
+                      "\"duration_days\": 3, \"history_days\": 1, \"anomalies\": []}\n```")
+        with patch("dataset_gen.is_live", return_value=True), \
+             patch("dataset_gen.generate_text", return_value=model_text):
+            spec = dataset_gen.generate_spec("ctx", "make a dataset")
+        self.assertEqual(spec["assets"][0]["id"], "M1")
+        self.assertEqual(spec["duration_days"], 3)
+        dataset = dataset_gen.build_dataset(dataset_gen.DatasetSpec.model_validate(spec))
+        self.assertGreaterEqual(len(dataset.history), 20)
+
 
 class IngestionExtraTests(PlatformTestBase):
     def test_extract_text_routes_xlsm_like_xlsx(self):

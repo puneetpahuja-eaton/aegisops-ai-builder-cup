@@ -16,11 +16,13 @@ from __future__ import annotations
 import hashlib
 import math
 from datetime import datetime, timedelta, timezone
+import json
+import re
 
 from pydantic import BaseModel, Field
 
 from fleet_data import FleetAsset, FleetDataset, Reading
-from gemini_client import generate_json, generate_text, is_live
+from gemini_client import generate_text, is_live
 
 _ANOMALY_CODE = {"spike": "OVERLOAD_ALARM", "sag": "VOLT_SAG", "drift": "THD_HIGH", "dropout": "LOAD_LOST"}
 
@@ -70,20 +72,58 @@ def clarifying_questions(device_context: str, request: str, reference: str = "")
     return generate_text(prompt, temperature=0.3)
 
 
+_SCHEMA_HINT = """Return ONLY a JSON object (no prose, no markdown fences) with this shape:
+{
+  "assets": [
+    {"id": "METER-1", "type": "METER", "criticality": "high",
+     "metrics": [{"name": "voltage_a_v", "unit": "V", "normal_min": 220, "normal_max": 240}]}
+  ],
+  "sample_interval_min": 1,
+  "duration_days": 3,
+  "history_days": 1,
+  "anomalies": [
+    {"asset_id": "METER-1", "metric": "voltage_a_v", "start_fraction": 0.5,
+     "kind": "sag", "severity": 0.7, "description": "voltage sag on phase A"}
+  ],
+  "notes": "assumptions here"
+}
+Rules: metric names are short snake_case; include unit and realistic normal_min/normal_max.
+anomaly kind is one of: spike, sag, drift, dropout. 1-10 assets, <=30 metrics each, 1-4 anomalies."""
+
+
+def _extract_json(text: str) -> dict:
+    text = text.strip()
+    fence = re.search(r"```(?:json)?\s*(\{.*\})\s*```", text, re.DOTALL)
+    if fence:
+        text = fence.group(1)
+    else:
+        start = text.find("{")
+        end = text.rfind("}")
+        if start != -1 and end != -1:
+            text = text[start:end + 1]
+    return json.loads(text)
+
+
 def generate_spec(device_context: str, request: str, reference: str = "", answers: str = "") -> dict:
     if not is_live():
         raise RuntimeError("Google AI is required to generate a dataset spec.")
     prompt = (
-        "Produce a COMPACT dataset specification (not the data itself) for a synthetic dataset of the "
+        "Design a COMPACT dataset specification (not the data itself) for a synthetic dataset of the "
         "monitored device. Choose realistic metrics with normal_min/normal_max ranges and units, grounded "
-        "in the context and referenced parameter list. Include 1-4 labelled anomalies. Keep <=10 assets and "
-        "<=30 metrics per asset. Durations in days.\n\n"
+        "in the context and referenced parameter list. Include 1-4 labelled anomalies. Make reasonable "
+        "assumptions for anything unspecified.\n\n"
+        f"{_SCHEMA_HINT}\n\n"
         f"Device context:\n{device_context[:8000]}\n\n"
         f"Referenced parameter file (optional, authoritative for names/IDs/units):\n{reference[:12000]}\n\n"
         f"User request: {request}\n\n"
         f"User answers to clarifying questions (if any): {answers}"
     )
-    return generate_json(prompt, DatasetSpec)
+    text = generate_text(prompt, temperature=0.3, max_output_tokens=16384)
+    try:
+        raw = _extract_json(text)
+    except (json.JSONDecodeError, ValueError) as error:
+        raise RuntimeError(f"Could not parse the dataset spec from the model response: {error}") from error
+    return DatasetSpec.model_validate(raw).model_dump()
 
 
 # --------------------------------------------------------------------------- #
