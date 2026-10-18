@@ -14,6 +14,8 @@ def client():
     from google.cloud import bigquery
     credentials = None
     if os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN"):
+        import authtoken
+        authtoken.ensure_fresh_token()
         from google.oauth2.credentials import Credentials
         credentials = Credentials(os.environ["GOOGLE_OAUTH_ACCESS_TOKEN"])
     return bigquery.Client(project=os.environ.get("GOOGLE_CLOUD_PROJECT"), credentials=credentials)

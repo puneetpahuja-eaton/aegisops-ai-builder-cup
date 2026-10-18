@@ -12,8 +12,12 @@ $env:GEMINI_MODEL = 'gemini-2.5-flash'
 $env:EMBED_MODEL = 'text-embedding-004'
 $env:GCS_BUCKET = 'aegisops-498775210896-demo'
 $env:BQ_DATASET = 'aegisops_audit'
+# Let the app auto-refresh the short-lived token so it never expires mid-session.
+$env:CLOUDSDK_PYTHON = $Python
+$env:CLOUDSDK_GCLOUD_PY = $Cli
+$env:AEGIS_TOKEN_REFRESH = '1'
 Set-Location $PSScriptRoot
 Write-Output 'Starting local cloud-backed demo on http://localhost:8506 (real Vertex AI + Gemini).'
-Write-Output 'The short-lived token expires in about one hour; restart this script to renew it.'
+Write-Output 'The access token now auto-refreshes; no need to restart hourly.'
 Write-Output 'After it starts, open Integrations and click "Re-ingest all" so knowledge is re-embedded with Vertex AI.'
 & $Python -m streamlit run app.py --server.port=8506 --server.headless=true --browser.gatherUsageStats=false

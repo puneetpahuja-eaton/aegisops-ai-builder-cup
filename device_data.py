@@ -33,6 +33,8 @@ def _gcs_blob(device_id: str):
 
     credentials = None
     if os.getenv("GOOGLE_OAUTH_ACCESS_TOKEN"):
+        import authtoken
+        authtoken.ensure_fresh_token()
         from google.oauth2.credentials import Credentials
         credentials = Credentials(os.environ["GOOGLE_OAUTH_ACCESS_TOKEN"])
     client = gcs.Client(project=os.environ.get("GOOGLE_CLOUD_PROJECT"), credentials=credentials)
