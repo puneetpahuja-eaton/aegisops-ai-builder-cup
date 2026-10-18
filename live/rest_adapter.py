@@ -188,15 +188,18 @@ def poll_params(config: dict) -> dict:
     if not param_ids:
         param_ids = [match.group(2)]
     param_ids = list(dict.fromkeys(param_ids))
+    # Per-param value path (e.g. a param whose response nests the value differently).
+    paths = {str(m["pid"]): (m.get("path") or "value") for m in (config.get("monitored") or [])}
 
     merged: dict[str, float] = {}
     raw: dict[str, Any] = {}
     errors: list[str] = []
     for pid in param_ids:
         url = _PARAM_URL.sub(lambda m: f"{m.group(1)}{pid}{m.group(3)}", endpoint)
+        value_path = paths.get(pid, "value")
         try:
-            # Monitor only the `value` field; ignore the echoed pid and other fields.
-            reading = poll_rest({**config, "endpoint": url, "field_map": {"value": "value"}})
+            # Monitor only the configured value field; ignore the echoed pid and other fields.
+            reading = poll_rest({**config, "endpoint": url, "field_map": {"value": value_path}})
         except Exception as error:  # noqa: BLE001
             errors.append(f"param {pid}: {error}")
             continue

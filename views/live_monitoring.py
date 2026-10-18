@@ -1,8 +1,6 @@
 """Engineer/Admin: live REST monitoring with real-time agentic analysis."""
 from __future__ import annotations
 
-import re
-
 import pandas as pd
 import streamlit as st
 
@@ -53,7 +51,6 @@ def _persist_monitored(device_id: str, monitored: list[dict]) -> None:
         for m in monitored if m.get("lower") is not None or m.get("upper") is not None or m.get("label")}
     _save_config(device_id, config)
 
-
 def _render_config(device: dict) -> dict:
     device_id = device["id"]
     config = _load_config(device_id)
@@ -73,51 +70,50 @@ def _render_config(device: dict) -> dict:
         index=0 if config.get("hex_as_float", True) else 1, disabled=simulated,
         help="How to decode 0x.. hex words. Eaton meter params are IEEE-754 floats.") == "IEEE-754 float (32-bit)"
 
-    # Monitored parameters: add one at a time (ID, lower, upper, label), listed below.
+    # Monitored parameters: a clean inline table (add rows, edit, delete) — no cluttered buttons.
     monitored = _monitored_list(config)
     if not simulated:
         st.markdown("**Monitored parameters**")
-        st.caption("Add a parameter ID with optional lower/upper limits and a label. A value below the "
-                   "lower or above the upper limit raises an issue with a grounded description.")
-        head = st.columns([2, 2, 2, 3, 1])
-        for col, title in zip(head, ["Parameter ID", "Lower", "Upper", "Label", ""]):
-            col.caption(title)
-        for index, item in enumerate(monitored):
-            row = st.columns([2, 2, 2, 3, 1])
-            row[0].write(f"p{item['pid']}")
-            row[1].write("—" if item.get("lower") is None else f"{item['lower']:g}")
-            row[2].write("—" if item.get("upper") is None else f"{item['upper']:g}")
-            row[3].write(item.get("label") or "—")
-            if row[4].button("Remove", key=f"rm_param_{device_id}_{item['pid']}"):
-                monitored = [m for m in monitored if m["pid"] != item["pid"]]
-                _persist_monitored(device_id, monitored)
-                st.rerun()
-        add = st.columns([2, 2, 2, 3, 1])
-        new_pid = add[0].text_input("Parameter ID", key=f"newpid_{device_id}", label_visibility="collapsed",
-                                    placeholder="22120")
-        new_lower = add[1].number_input("Lower", key=f"newlo_{device_id}", value=None, step=1.0,
-                                        format="%.4f", label_visibility="collapsed")
-        new_upper = add[2].number_input("Upper", key=f"newhi_{device_id}", value=None, step=1.0,
-                                        format="%.4f", label_visibility="collapsed")
-        new_label = add[3].text_input("Label", key=f"newlbl_{device_id}", label_visibility="collapsed",
-                                      placeholder="e.g. Phase A voltage")
-        if add[4].button("➕ Add", key=f"addparam_{device_id}"):
-            pid = (new_pid or "").strip()
-            if not pid:
-                st.warning("Enter a parameter ID to add.")
-            elif any(m["pid"] == pid for m in monitored):
-                st.warning(f"Parameter {pid} is already monitored.")
-            else:
-                monitored.append({"pid": pid,
-                                  "lower": float(new_lower) if new_lower is not None else None,
-                                  "upper": float(new_upper) if new_upper is not None else None,
-                                  "label": (new_label or "").strip()})
-                _persist_monitored(device_id, monitored)
-                st.rerun()
+        st.caption("Add a row per parameter: ID, optional lower/upper limits, a label, and (optional) the "
+                   "JSON path to its value if the response structure differs. A value below the lower or "
+                   "above the upper limit raises an issue with a grounded description. Use the + row to add "
+                   "and the 🗑 to remove.")
+        table = pd.DataFrame(
+            [{"Parameter ID": m["pid"], "Lower": m.get("lower"), "Upper": m.get("upper"),
+              "Label": m.get("label", ""), "Value path": m.get("path", "")} for m in monitored],
+            columns=["Parameter ID", "Lower", "Upper", "Label", "Value path"])
+        edited = st.data_editor(
+            table, num_rows="dynamic", hide_index=True, width="stretch", key=f"params_table_{device_id}",
+            column_config={
+                "Parameter ID": st.column_config.TextColumn("Parameter ID", required=True, width="small"),
+                "Lower": st.column_config.NumberColumn("Lower", format="%.4f", width="small"),
+                "Upper": st.column_config.NumberColumn("Upper", format="%.4f", width="small"),
+                "Label": st.column_config.TextColumn("Label", width="medium"),
+                "Value path": st.column_config.TextColumn("Value path (optional)", width="small",
+                                                          help="Default: value. Override if a param's "
+                                                               "response nests the value differently."),
+            })
+        new_monitored: list[dict] = []
+        seen: set[str] = set()
+        for _, record in edited.iterrows():
+            pid = str(record["Parameter ID"]).strip() if pd.notna(record["Parameter ID"]) else ""
+            if not pid or pid in seen:
+                continue
+            seen.add(pid)
+            new_monitored.append({
+                "pid": pid,
+                "lower": float(record["Lower"]) if pd.notna(record["Lower"]) else None,
+                "upper": float(record["Upper"]) if pd.notna(record["Upper"]) else None,
+                "label": str(record["Label"]).strip() if pd.notna(record["Label"]) else "",
+                "path": str(record["Value path"]).strip() if pd.notna(record["Value path"]) else "",
+            })
+        if new_monitored != monitored:
+            _persist_monitored(device_id, new_monitored)
+        monitored = new_monitored
         if monitored:
-            st.caption(f"Monitoring **{len(monitored)}** parameter(s). Only each param's `value` is tracked.")
+            st.caption(f"Monitoring **{len(monitored)}** parameter(s) — each tracked and charted separately.")
         else:
-            st.info("No parameters added yet. Add at least one above.")
+            st.info("No parameters added yet. Add at least one row above.")
 
     param_ids = [m["pid"] for m in monitored]
     thresholds = {f"p{m['pid']}": {k: v for k, v in
@@ -135,7 +131,9 @@ def _render_config(device: dict) -> dict:
     username = col2.text_input("Username", disabled=simulated or auth_mode not in ("basic", "digest"))
     password = col3.text_input("Password / token", type="password",
                                disabled=simulated or auth_mode == "none")
-    interval = st.slider("Poll interval (seconds)", 1, 30, value=int(config.get("interval", 3)))
+    interval = st.number_input("Poll interval (seconds)", min_value=1, max_value=86400,
+                               value=int(config.get("interval", 10)), step=1, disabled=simulated,
+                               help="How often to poll each parameter. Any value from 1 second upward.")
 
     with st.expander("🔒 TLS / certificate (for HTTPS field devices)"):
         st.caption("On-prem devices often use a self-signed or private-CA certificate. Prefer pinning the "
@@ -150,24 +148,26 @@ def _render_config(device: dict) -> dict:
         if not verify_tls:
             st.warning("TLS verification is OFF for this device. Use only on a trusted private network.")
 
-    st.subheader("What to monitor")
-    st.caption("Let the agent read this device's datasheet and a sample response to map the fields.")
-    sample = st.text_area("Sample response JSON (optional, for agent mapping)",
-                          value=config.get("sample", ""), height=120)
     field_map = config.get("field_map", {})
-    if st.button("🤖 Ask agent to map fields", disabled=not sample.strip()):
-        with st.spinner("Agent inferring field mapping from the datasheet..."):
-            try:
-                suggestion = suggest_field_map(device_id, sample)
-            except Exception as error:  # noqa: BLE001
-                st.error(str(error))
-            else:
-                field_map = suggestion.get("field_map", {})
-                config["event_path"] = suggestion.get("event_path", "")
-                st.success("Agent proposed a field mapping.")
-                if suggestion.get("rationale"):
-                    st.caption(suggestion["rationale"])
-    st.write("Field map (metric → JSON path):", field_map or "— (simulated feed provides standard metrics)")
+    with st.expander("🤖 Advanced: agent field mapping (for non-/rs/param endpoints)"):
+        st.caption("Optional. For a generic endpoint, paste a sample response and let the agent map fields "
+                   "from the datasheet. Not needed for /rs/param devices — their values are auto-extracted.")
+        sample = st.text_area("Sample response JSON", value=config.get("sample", ""), height=100,
+                              disabled=simulated)
+        if st.button("Ask agent to map fields", disabled=not sample.strip()):
+            with st.spinner("Agent inferring field mapping from the datasheet..."):
+                try:
+                    suggestion = suggest_field_map(device_id, sample)
+                except Exception as error:  # noqa: BLE001
+                    st.error(str(error))
+                else:
+                    field_map = suggestion.get("field_map", {})
+                    config["event_path"] = suggestion.get("event_path", "")
+                    st.success("Agent proposed a field mapping.")
+                    if suggestion.get("rationale"):
+                        st.caption(suggestion["rationale"])
+        if field_map:
+            st.write("Field map (metric → JSON path):", field_map)
 
     if st.button("💾 Save connection"):
         secret_ref = config.get("secret_ref") or f"live_{device_id}"
@@ -287,17 +287,32 @@ def render() -> None:
 
         history = st.session_state.get(hist_key, [])
         last_metrics = st.session_state.get(f"live_lastmetrics_{device_id}")
-        if last_metrics is not None and not config.get("simulated", True):
-            if last_metrics:
-                st.caption("Latest extracted values: " + ", ".join(
-                    f"{k}={v}" for k, v in list(last_metrics.items())[:10]))
-            else:
-                st.warning("The device responded but no numeric value was found. Expand the raw response "
-                           "below and map the field, or the value may be non-numeric.")
+        if last_metrics is not None and not config.get("simulated", True) and not last_metrics:
+            st.warning("The device responded but no numeric value was found. Expand the raw response "
+                       "below, or set the value path for that parameter.")
         if history:
             frame = pd.DataFrame(history).set_index("timestamp")
-            if len(frame.columns):
-                st.line_chart(frame)
+            columns = [c for c in frame.columns if c != "timestamp"]
+            if config.get("simulated", True):
+                if columns:
+                    st.line_chart(frame[columns])
+            else:
+                # One chart per parameter so different PIDs are never clubbed together.
+                labels = {f"p{m['pid']}": (m.get("label") or f"p{m['pid']}")
+                          for m in (config.get("monitored") or [])}
+                groups: dict[str, list[str]] = {}
+                for col in columns:
+                    base = col.split(".", 1)[0]  # p<id> (multi-word words grouped with their param)
+                    groups.setdefault(base, []).append(col)
+                for base, cols in groups.items():
+                    title = labels.get(base, base)
+                    st.markdown(f"**{title}** (`{base}`)")
+                    series = frame[cols].dropna(how="all")
+                    latest = series[cols[0]].dropna()
+                    if not latest.empty:
+                        st.caption(f"latest: {latest.iloc[-1]:g}")
+                    if len(series):
+                        st.line_chart(series)
         if monitor.issues:
             st.subheader("Detected issues")
             _badge = {"ESCALATED": "🔴", "MONITORING": "🟠", "RESOLVED": "🟢"}

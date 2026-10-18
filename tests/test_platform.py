@@ -296,6 +296,30 @@ class LiveAdapterTests(PlatformTestBase):
         self.assertEqual(reading["metrics"]["value.0"], 10.0)
         self.assertEqual(reading["metrics"]["value.2"], 255.0)
 
+    def test_poll_params_uses_per_param_value_path(self):
+        class FakeResponse:
+            def __init__(self, p):
+                self._p = p
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return self._p
+
+        def fake_get(url, **kwargs):
+            pid = url.rstrip("/").split("/")[-2]
+            # Param 1 nests the value under data.v; param 2 uses the default `value`.
+            return FakeResponse({"data": {"v": "0x41F00000"}} if pid == "1" else {"value": "0x3F800000"})
+
+        config = {"endpoint": "https://x/rs/param/1/value", "auth_mode": "none", "hex_as_float": True,
+                  "param_ids": ["1", "2"],
+                  "monitored": [{"pid": "1", "path": "data.v"}, {"pid": "2", "path": ""}]}
+        with patch("live.rest_adapter.requests.get", side_effect=fake_get):
+            reading = rest_adapter.poll("rest", config)
+        self.assertAlmostEqual(reading["metrics"]["p1"], 30.0, places=3)
+        self.assertAlmostEqual(reading["metrics"]["p2"], 1.0, places=3)
+
     def test_poll_params_merges_multiple_ids(self):
         responses = {
             "22120": {"pid": 22120, "value": "0x0000000A"},
