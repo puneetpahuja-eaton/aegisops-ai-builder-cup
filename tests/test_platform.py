@@ -677,8 +677,8 @@ class DatasetGenTests(PlatformTestBase):
         import dataset_gen
         spec = dataset_gen.DatasetSpec.model_validate({
             "assets": [{"id": "METER-1", "type": "METER", "criticality": "high",
-                        "metrics": [{"name": "voltage_a_v", "unit": "V", "normal_min": 220, "normal_max": 240},
-                                    {"name": "current_a_a", "unit": "A", "normal_min": 0, "normal_max": 100}]}],
+                        "metrics": [{"name": "voltage_a_v", "unit": "V", "normal_min": 228, "normal_max": 232},
+                                    {"name": "current_a_a", "unit": "A", "normal_min": 10, "normal_max": 90}]}],
             "sample_interval_min": 5, "duration_days": 1, "history_days": 1,
             "anomalies": [{"asset_id": "METER-1", "metric": "voltage_a_v", "start_fraction": 0.5,
                            "kind": "sag", "severity": 0.8, "description": "voltage sag"}]})
@@ -686,11 +686,38 @@ class DatasetGenTests(PlatformTestBase):
         self.assertEqual(len(dataset.assets), 1)
         self.assertGreaterEqual(len(dataset.history), 20)
         self.assertTrue(dataset.telemetry)
-        # History is all healthy; replay contains the injected anomaly code.
+        # History is all healthy; replay contains the injected sag code.
         self.assertTrue(all(code == "OK" for r in dataset.history for code in r.event_codes))
         self.assertTrue(any("VOLT_SAG" in r.event_codes for r in dataset.telemetry))
         metrics = {m for r in dataset.telemetry for m in r.metrics}
         self.assertEqual(metrics, {"voltage_a_v", "current_a_a"})
+
+    def test_build_dataset_is_physically_consistent(self):
+        import dataset_gen
+        import math
+        names = [("voltage_a_rms", "V", 228, 232), ("voltage_b_rms", "V", 228, 232),
+                 ("voltage_c_rms", "V", 228, 232), ("current_a_rms", "A", 10, 90),
+                 ("current_b_rms", "A", 10, 90), ("current_c_rms", "A", 10, 90),
+                 ("active_power_total", "W", 0, 60000), ("reactive_power_total", "var", 0, 30000),
+                 ("apparent_power_total", "VA", 0, 65000), ("power_factor_total", "", 0.88, 0.96),
+                 ("active_energy_total_kwh", "kWh", 0, 1e9)]
+        spec = dataset_gen.DatasetSpec.model_validate({
+            "assets": [{"id": "M1", "type": "METER", "criticality": "high",
+                        "metrics": [{"name": n, "unit": u, "normal_min": lo, "normal_max": hi}
+                                    for n, u, lo, hi in names]}],
+            "sample_interval_min": 5, "duration_days": 1, "history_days": 1, "anomalies": []})
+        rows = dataset_gen.build_dataset(spec).telemetry
+        energy = [r.metrics["active_energy_total_kwh"] for r in rows]
+        self.assertTrue(all(energy[i + 1] >= energy[i] - 1e-6 for i in range(len(energy) - 1)),
+                        "active energy must be monotonically increasing")
+        for r in rows:
+            p = r.metrics["active_power_total"]
+            q = r.metrics["reactive_power_total"]
+            s = r.metrics["apparent_power_total"]
+            pf = r.metrics["power_factor_total"]
+            self.assertGreaterEqual(s + 1.0, p, "apparent >= active")
+            self.assertAlmostEqual(pf, p / s if s else 0, delta=0.03)
+            self.assertAlmostEqual(s, math.sqrt(p * p + q * q), delta=max(5.0, 0.02 * s))
 
     def test_build_dataset_respects_row_limits(self):
         import dataset_gen
