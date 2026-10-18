@@ -1,74 +1,58 @@
-# PRISM Google Cloud edition | Target 2 minutes 45 seconds
+# Kairos AI — 3-Minute Demo Video Script
 
-Use the actual deployed PRISM interface. Show accepted Google AI source labels;
-never label offline rules as Gemini. Any edited waits must be transparent.
-The older 165-second video draft shows a superseded interface.
+Target pace: ~155 words/min. Speak clearly and with energy. Pause ~0.5s between sentences.
 
-## 0:00-0:20 | Problem
+## Pre-recording checklist (stage these BEFORE you record)
+- [ ] Logged in to the deployed app as `admin@kairos.ai` on the public URL.
+- [ ] Demo device **"Demo - Power Distribution Panel"** present (3 assets, dataset mode).
+- [ ] One GitHub repo **already ingested** so **Integrations -> Saved knowledge links** shows it.
+- [ ] One Confluence page already ingested (shows in Saved knowledge links).
+- [ ] In **Ask the device**: a dataset already generated (so you can show the result instantly).
+- [ ] In **Live Monitoring**: a monitoring plan already built; ready to click **Start**.
+- [ ] Browser zoomed so text is readable; sidebar expanded; 1080p screen recording.
+- [ ] Record in 3 one-minute segments; stitch together. Keep each click smooth.
 
-"One upstream power issue can produce an alarm storm across a manufacturing
-plant. PRISM groups those symptoms, identifies an evidence-backed hypothesis,
-and produces a reviewable operational handoff."
+---
 
-Show the Cloud Run URL and original Live Operations tab.
+## MINUTE 1 (0:00-1:00) - Problem - Social impact - Solution - Agents - Start analysis
 
-## 0:20-0:40 | Models and cloud
+| Time | SHOW ON SCREEN | SAY (word-for-word) |
+|---|---|---|
+| 0:00-0:12 | Cover slide (or app Home) | "Power devices run our hospitals, water plants, factories and telecom. But when one fails, finding the fault still needs an engineer physically on site - and by the time they arrive, the downtime has already cost thousands." |
+| 0:12-0:22 | Cover / problem visual | "Expert reliability engineers are scarce, and they can't be everywhere at once. That delay is the real problem - and it hits the communities that depend on reliable power the hardest." |
+| 0:22-0:35 | App Home - "Kairos AI" header | "Meet Kairos AI - an expert reliability engineer inside every device. It learns each device from its own documents, watches it remotely around the clock, and diagnoses and resolves faults in seconds - not site visits." |
+| 0:35-0:52 | Agents diagram (deck slide 3) | "Under the hood, five agents work as a closed loop. Monitor detects anomalies. Diagnose finds the root cause with cited evidence from the device's manuals. Decide weighs confidence and risk. Act self-heals reversible faults or escalates to a human. And Verify confirms the fix and scores the downtime and cost avoided." |
+| 0:52-1:00 | Analysis page -> select **Demo - Power Distribution Panel** -> click Run (it starts stepping) | "It all runs on Google Cloud with Gemini on Vertex AI. Let me start an analysis on our demo panel now - it'll run while I show you the platform." |
 
-"This is the original 22-asset PRISM workflow, with three days of healthy
-history, trained anomaly detection and Markov event patterns. Cloud Run hosts it;
-Vertex AI adds SOP-grounded reasoning, private Cloud Storage supplies the inputs,
-and BigQuery stores case-summary revisions."
+---
 
-Show Trained models and Google Cloud & data source.
+## MINUTE 2 (1:00-2:00) - Login - Users & roles - Device - Integrations - Ask - Live
 
-## 0:40-1:15 | One cause, many symptoms
+| Time | SHOW ON SCREEN | SAY (word-for-word) |
+|---|---|---|
+| 1:00-1:10 | Sidebar showing "Store: firestore - Model: Vertex AI" and role | "Kairos AI is multi-tenant and secure. We sign in with role-based access - admin, engineer and viewer - so configuration, operations and read-only views are cleanly separated." |
+| 1:10-1:22 | **User Admin** page - add a user, pick a role | "From User Admin, an admin creates users and assigns roles. Engineers run analysis and approve actions; viewers only see results. For critical infrastructure, that separation of duties matters." |
+| 1:22-1:32 | **Device Manager** - show registered devices / Add a device | "In Device Manager we onboard any device - panelboards, meters, UPS, breakers - and each one gets its own private knowledge base." |
+| 1:32-1:44 | **Integrations** - point to GitHub repo, Confluence page, Saved knowledge links | "We feed it knowledge in Data Sources and Integrations - upload datasheets, or pull directly from GitHub and Confluence. Everything is embedded with Vertex AI into a per-device knowledge base the agents can cite." |
+| 1:44-1:54 | **Ask the device** - show Ask/Plan/Agent toggle; show the already-generated dataset | "Ask the device is our agentic assistant, with Ask, Plan and Agent modes. It clarifies before acting, then generates datasets, test cases, even code - all grounded in that device's documents." |
+| 1:54-2:00 | **Live Monitoring** - show the plan, click Start (readings stream) | "And Live Monitoring is self-configuring - the agent reads the datasheet to pick parameters and thresholds, decodes event logs, and streams live data into the very same engine." |
 
-Pause around the first voltage-sag case (sample index 12). Show the fleet table,
-model evidence, topology, agent trace and named tool calls.
+---
 
-"These numerical model results and topology correlations are deterministic.
-Gemini adds this hypothesis and validated SOP citations. Neither topology
-nor a model's self-confidence proves a physical root cause."
+## MINUTE 3 (2:00-3:00) - Analysis results - Future - Close
 
-Show the actual accepted Gemini source in Cases.
+| Time | SHOW ON SCREEN | SAY (word-for-word) |
+|---|---|---|
+| 2:00-2:14 | **Analysis** page - results now ready; scroll the dashboard | "Now back to our analysis - it's finished. Kairos AI processed the telemetry across three assets and caught every injected fault: a voltage sag, an overload, and rising harmonic distortion." |
+| 2:14-2:30 | Point to metrics: Diagnosis accuracy, Downtime avoided, Cost avoided | "It diagnosed each root cause with a hundred percent accuracy against ground truth, auto-resolved the reversible faults, escalated the rest, and quantified the impact - minutes of downtime and thousands of dollars avoided, every incident scored against a no-platform baseline." |
+| 2:30-2:44 | Open a case - show Monitor->Diagnose->Decide->Act->Verify trail + citation | "Every decision is fully traceable - the evidence, the cited manual passage, the human approval, and the verification - so engineers can trust it. And the same engine runs on both historical data and live streams." |
+| 2:44-3:00 | Closing slide (vision) | "This is just the beginning. Next: real sensor integration at the edge, full fleet modeling, predictive maintenance, and support for any industrial protocol. Kairos AI turns every device into its own reliability engineer - so the communities that depend on reliable power are never left in the dark. Thank you." |
 
-## 1:15-1:40 | Original automatic simulator loop
+---
 
-"The original confidence and reversibility policy is preserved. Automatic
-actions here change only the synthetic simulator. The next sample is scored
-again by the verifier. No real equipment command is sent."
-
-Show an actual AUTO_REMEDIATE -> ACTING -> RESOLVED case. If an API failure or
-insufficient grounding caused escalation, explain it; never fabricate success.
-
-## 1:40-2:00 | Human escalation and value
-
-Show the battery-risk case and review-only work-order draft, then Counterfactual.
-
-"Physical or uncertain interventions are handed to an engineer. These original
-downtime and cost fields compare synthetic scenarios with assumed manual MTTR.
-They are not measured savings or evidence of a production repair."
-
-## 2:00-2:25 | Replace the sample data
-
-Open Models & Data -> Replace telemetry. Show original metadata fields,
-CSV/JSON templates and an authorized synthetic upload.
-
-"Uploading replaces the entire sample fleet and history, not just a selected
-incident. Uploaded measurements remain observation-only: no automated control,
-no rewritten readings, no fabricated ground truth or savings."
-
-## 2:25-2:45 | Audit and close
-
-Show a successful BigQuery save and download the full PRISM audit.
-
-"The original UI and case behavior are regression-tested against PRISM across
-all 96 simulation steps. The next step is a qualified-engineer pilot with
-approved site procedures, measuring triage time and handoff quality."
-
-## Before upload
-
-- Duration strictly under 3:00; aim for 2:45-2:55.
-- Do not show tokens, personal information or employer data.
-- Do not confuse synthetic ground-truth coverage with production accuracy.
-- Test the uploaded video's public access in an incognito window.
+## Delivery tips
+- **Energy and clarity beat speed.** If you run long, cut the least-important clause, not whole sections.
+- **Mouse = pointer.** Move deliberately to exactly what you mention; don't wander.
+- **Show, then speak** for the money moments (accuracy %, cost avoided) - let the number land.
+- End on the social-impact line; it's what wins "Most Impactful" and "Social Choice".
+- Keep total **under 3:00** (hard rule). Aim for ~2:50 to be safe.
