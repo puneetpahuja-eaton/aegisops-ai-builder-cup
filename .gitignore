@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 .localstore/
+telemetry/
 last_run.txt
 loop_test.txt
 *.log
