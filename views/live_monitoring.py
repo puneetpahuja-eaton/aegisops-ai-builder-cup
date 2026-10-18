@@ -1,6 +1,10 @@
 """Engineer/Admin: live REST monitoring with real-time agentic analysis."""
 from __future__ import annotations
 
+import ipaddress
+import os
+from urllib.parse import urlparse
+
 import pandas as pd
 import streamlit as st
 
@@ -13,6 +17,44 @@ import ui_common
 from live import rest_adapter, sim_feed
 from live.inference import suggest_field_map
 from live.monitor import LiveMonitor
+
+
+def _is_private_host(host: str) -> bool:
+    if not host:
+        return False
+    if host == "localhost" or host.endswith(".local"):
+        return True
+    try:
+        return ipaddress.ip_address(host).is_private
+    except ValueError:
+        return False
+
+
+def _poll_failure_hint(error: Exception, config: dict) -> str | None:
+    """Return an actionable hint for connection/timeout failures, else None."""
+    text = str(error).lower()
+    connection = any(s in text for s in (
+        "timed out", "timeout", "max retries", "connection", "failed to establish",
+        "name or service", "unreachable", "refused", "no route"))
+    if not connection:
+        return None
+    host = ""
+    try:
+        host = urlparse(config.get("endpoint") or "").hostname or ""
+    except ValueError:
+        host = ""
+    on_cloud = bool(os.getenv("K_SERVICE"))  # Cloud Run sets K_SERVICE.
+    if _is_private_host(host) and on_cloud:
+        return (f"**{host}** is a private network address, which this cloud deployment cannot reach. "
+                "For a live demo, enable **Use built-in simulated feed** in *Configure connection* above. "
+                "To poll this real device, run Kairos AI on a machine on the same network as the device "
+                "(for example locally), or expose the device through a public endpoint or VPN.")
+    if _is_private_host(host):
+        return (f"Couldn't reach **{host}**. Make sure this machine is on the same network as the device "
+                "and the endpoint, TLS and credentials are correct. For a no-device demo, enable the "
+                "built-in simulated feed in *Configure connection*.")
+    return ("Couldn't connect to the device endpoint. Check the URL, network access and TLS/auth. "
+            "For a no-device demo, enable **Use built-in simulated feed** in *Configure connection*.")
 
 
 def _plan_builder(device: dict) -> None:
@@ -385,6 +427,19 @@ def render() -> None:
                 reading = _poll(device, config)
             except Exception as error:  # noqa: BLE001
                 st.error(f"Poll failed: {error}")
+                hint = _poll_failure_hint(error, config)
+                if hint:
+                    st.info(hint)
+                    if not config.get("simulated", True) and st.button(
+                            "▶ Switch to simulated feed and restart", key=f"live_sim_switch_{device_id}"):
+                        cfg = _load_config(device_id)
+                        cfg["simulated"] = True
+                        _save_config(device_id, cfg)
+                        st.session_state[mon_key] = LiveMonitor(
+                            criticality=device["criticality"], thresholds=config.get("thresholds") or {})
+                        st.session_state[hist_key] = []
+                        st.session_state[on_key] = True
+                        st.rerun()
                 st.session_state[on_key] = False
                 return
             new_issues = monitor.observe(reading)
