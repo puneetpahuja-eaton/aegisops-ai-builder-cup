@@ -54,15 +54,19 @@ def _render_artifacts(artifacts: list[dict], message_index: int) -> None:
                        "or split it if you need the full set.")
 
 
-def _run_assistant(device_id: str, prompt: str, history_key: str) -> None:
+def _run_assistant(device_id: str, prompt: str, history_key: str, mode: str) -> None:
     st.session_state[history_key].append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
     with st.chat_message("assistant"):
-        with st.spinner("Thinking and generating..."):
-            result = rag.assist(device_id, prompt, screen_context=_screen_context(device_id),
-                                role=ui_common.current_role(),
-                                history=st.session_state[history_key][:-1])
+        spinner = {"ask": "Thinking…", "plan": "Planning…", "agent": "Working…"}.get(mode, "Thinking…")
+        with st.spinner(spinner):
+            result = rag.converse(device_id, prompt, mode=mode, screen_context=_screen_context(device_id),
+                                  role=ui_common.current_role(),
+                                  history=st.session_state[history_key][:-1])
+        badge = {"ask": "💬 Ask", "plan": "📋 Plan", "agent": "🤖 Agent"}.get(mode, mode)
+        st.caption(badge + (" · awaiting your answer" if result.get("needs_clarification")
+                            else " · awaiting your confirmation" if result.get("awaiting_confirmation") else ""))
         st.markdown(result["answer"])
         if result.get("artifacts"):
             _render_artifacts(result["artifacts"], len(st.session_state[history_key]))
@@ -149,8 +153,8 @@ def _load_reference(device_id: str, ref_path: str) -> str:
 
 def render() -> None:
     st.title("💬 Ask the device")
-    st.caption("A capable assistant grounded in each device's ingested data (RAG). Ask questions, or ask it "
-               "to **create historic datasets, test cases, code, documentation** — artifacts are downloadable.")
+    st.caption("A capable assistant grounded in each device's ingested data (RAG). Three interactive modes — "
+               "**Ask**, **Plan**, **Agent** — all clarify first when a request is vague.")
     status = rag.status()
     st.caption(f"Embeddings: `{status['embeddings']}` · Model: `{status['model']}` · "
                f"retrieves top {status.get('top_k', 24)} passages · remembers the conversation")
@@ -160,7 +164,22 @@ def render() -> None:
         return
     device_id = device["id"]
     history_key = f"chat_history_{device_id}"
+    mode_key = f"chat_mode_{device_id}"
     st.session_state.setdefault(history_key, [])
+
+    mode_labels = {"💬 Ask": "ask", "📋 Plan": "plan", "🤖 Agent": "agent"}
+    mode_help = ("**Ask** answers questions (clarifies if vague). **Plan** proposes an interactive plan, then "
+                 "asks to implement. **Agent** clarifies, plans and executes — generating datasets, code and "
+                 "docs. Switch anytime; the conversation is shared.")
+    chosen = st.radio("Mode", list(mode_labels), horizontal=True, help=mode_help,
+                      index=["ask", "plan", "agent"].index(st.session_state.get(mode_key, "agent")),
+                      key=f"mode_radio_{device_id}")
+    mode = mode_labels[chosen]
+    st.session_state[mode_key] = mode
+    cols = st.columns([1, 4])
+    if cols[0].button("🗑 Clear chat", key=f"clear_{device_id}"):
+        st.session_state[history_key] = []
+        st.rerun()
 
     if ingest.corpus_size(device_id) == 0:
         st.info("No knowledge ingested for this device yet. Add data in **Data Sources**.")
@@ -182,9 +201,11 @@ def render() -> None:
             if message.get("citations"):
                 st.caption("Sources: " + ", ".join(message["citations"]))
 
-    prompt = st.chat_input("Ask, or request a dataset / test cases / code / docs...")
+    placeholder = {"ask": "Ask a question…", "plan": "Describe a task to plan…",
+                   "agent": "Tell the agent what to do…"}[mode]
+    prompt = st.chat_input(placeholder)
     user_prompt = prompt or pending
     if not user_prompt:
         return
-    _run_assistant(device_id, user_prompt, history_key)
+    _run_assistant(device_id, user_prompt, history_key, mode)
     st.rerun()

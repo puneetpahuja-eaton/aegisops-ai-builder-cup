@@ -154,6 +154,37 @@ class RagTests(PlatformTestBase):
         result = rag.answer(device["id"], "anything")
         self.assertFalse(result["grounded"])
 
+    def test_converse_asks_clarifying_questions_when_vague(self):
+        device = devices.create_device(name="Meter", type="METER")
+        ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage info " * 40)
+        fake = {"needs_clarification": True, "clarifying_questions": ["Which phase?", "What time range?"],
+                "awaiting_confirmation": False, "answer": ""}
+        with patch("rag.is_live", return_value=True), patch("rag.generate_json", return_value=fake):
+            result = rag.converse(device["id"], "make a dataset", mode="ask")
+        self.assertTrue(result["needs_clarification"])
+        self.assertIn("Which phase?", result["answer"])
+        self.assertEqual(result["mode"], "ask")
+
+    def test_converse_plan_awaits_confirmation(self):
+        device = devices.create_device(name="Meter", type="METER")
+        ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage info " * 40)
+        fake = {"needs_clarification": False, "clarifying_questions": [], "awaiting_confirmation": True,
+                "answer": "Plan:\n1. Define metrics\n2. Generate\nShall I implement this?"}
+        with patch("rag.is_live", return_value=True), patch("rag.generate_json", return_value=fake):
+            result = rag.converse(device["id"], "plan a dataset", mode="plan")
+        self.assertTrue(result["awaiting_confirmation"])
+        self.assertIn("Plan:", result["answer"])
+
+    def test_converse_agent_extracts_artifact(self):
+        device = devices.create_device(name="Meter", type="METER")
+        ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage info " * 40)
+        fake = {"needs_clarification": False, "clarifying_questions": [], "awaiting_confirmation": False,
+                "answer": "Done.\n```csv\nts,v\n1,230\n2,231\n3,229\n```"}
+        with patch("rag.is_live", return_value=True), patch("rag.generate_json", return_value=fake):
+            result = rag.converse(device["id"], "generate csv", mode="agent")
+        self.assertEqual(len(result["artifacts"]), 1)
+        self.assertEqual(result["artifacts"][0]["lang"], "csv")
+
     def test_extract_artifacts_from_fenced_blocks(self):
         text = ("Here is your dataset.\n```csv\ntimestamp,voltage,current\n2026-01-01,230,5\n"
                 "2026-01-02,231,5.1\n```\nAnd a test file:\n```json\n{\"cases\": [1, 2, 3, 4, 5]}\n```")
@@ -176,9 +207,9 @@ class RagTests(PlatformTestBase):
     def test_assist_generates_and_extracts_artifact(self):
         device = devices.create_device(name="Meter", type="METER")
         ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage and current info " * 40)
-        fake = "Synthetic dataset below.\n```csv\nts,v,i\n1,230,5\n2,231,5\n3,229,5\n```"
-        with patch("rag.is_live", return_value=True), \
-             patch("rag.generate_text", return_value=fake):
+        fake = {"needs_clarification": False, "clarifying_questions": [], "awaiting_confirmation": False,
+                "answer": "Synthetic dataset below.\n```csv\nts,v,i\n1,230,5\n2,231,5\n3,229,5\n```"}
+        with patch("rag.is_live", return_value=True), patch("rag.generate_json", return_value=fake):
             result = rag.assist(device["id"], "create a historic dataset")
         self.assertEqual(len(result["artifacts"]), 1)
         self.assertEqual(result["artifacts"][0]["lang"], "csv")
