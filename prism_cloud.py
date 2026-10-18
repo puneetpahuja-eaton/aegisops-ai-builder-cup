@@ -85,7 +85,10 @@ class CloudDecider(DeciderAgent):
     def decide(self, case, bb) -> None:
         # Preserve PRISM's exact deterministic confidence/reversibility policy.
         super().decide(case, bb)
-        if self.engine.source == "uploaded":
+        # Real uploaded field data has no measured intervention, so it stays
+        # observation-only. A LABELED generated dataset recovers in its own
+        # telemetry, so the engine may auto-remediate and the Verifier confirms.
+        if self.engine.source == "uploaded" and not self.engine.labeled:
             case.decision = "ESCALATE"
             case.decision_reason = "Uploaded telemetry is observation-only; simulated control is disabled. " + case.decision_reason
         self.engine.enrich(case, bb)
@@ -97,7 +100,7 @@ class CloudActuator(ActuatorAgent):
         self.engine = engine
 
     def act(self, case, step, fault, bb) -> str:
-        if self.engine.source == "uploaded" and case.decision == "AUTO_REMEDIATE":
+        if self.engine.source == "uploaded" and not self.engine.labeled and case.decision == "AUTO_REMEDIATE":
             raise RuntimeError("Uploaded measurements cannot receive simulated control.")
         result = super().act(case, step, fault, bb)
         detail = self.engine.cloud_cases.get(case.case_id)
@@ -170,13 +173,33 @@ class Engine(ReferenceEngine):
         self.train()
         self.reset()
 
+    @staticmethod
+    def _detection_features(rows, all_features):
+        """Drop monotonic cumulative columns (e.g. energy registers) from anomaly
+        detection. They only ever increase, so during replay they sit far above the
+        healthy-history median and would saturate the robust-Z detector on every
+        sample — making the asset look permanently faulted and blocking auto-resolve.
+        They remain in the dataset for display; they are just not deviation signals."""
+        if len(rows) < 4:
+            return all_features
+        kept = []
+        for feature in all_features:
+            series = [float(r.metrics.get(feature, 0.0) or 0.0) for r in rows]
+            deltas = [b - a for a, b in zip(series, series[1:])]
+            non_decreasing = sum(1 for d in deltas if d >= -1e-9) / len(deltas)
+            growth = series[-1] - series[0]
+            cumulative = non_decreasing >= 0.95 and growth > abs(series[0]) * 0.05 + 1e-6
+            if not cumulative:
+                kept.append(feature)
+        return kept or all_features
+
     def build_history(self):
         if self.dataset is None:
             return super().build_history()
         history, codes = {}, {}
         for asset_id in self.topo.all_ids():
             rows = [row for row in self.dataset.history if row.asset_id == asset_id]
-            features = sorted(rows[0].metrics)
+            features = self._detection_features(rows, sorted(rows[0].metrics))
             history[asset_id] = {"X": [[row.metrics[key] for key in features] for row in rows], "features": features}
             codes[asset_id] = [row.event_codes[0] if row.event_codes else "OK" for row in rows]
         return history, codes

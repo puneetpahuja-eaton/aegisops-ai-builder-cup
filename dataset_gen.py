@@ -50,6 +50,10 @@ class AnomalySpec(BaseModel):
     start_fraction: float = Field(default=0.5, ge=0, le=1, description="Where in the replay it begins (0..1)")
     kind: str = Field(default="spike", description="spike | sag | drift | dropout")
     severity: float = Field(default=0.6, ge=0, le=1)
+    recovers: bool = Field(default=True, description="If true, the fault clears after its window so the "
+                                                     "engine auto-resolves it; if false, it persists and is escalated.")
+    duration_fraction: float = Field(default=0.25, ge=0.05, le=1.0,
+                                     description="How much of the replay the fault lasts before it clears (when recovers).")
     description: str = ""
 
 
@@ -248,10 +252,24 @@ def build_dataset(spec: DatasetSpec) -> FleetDataset:
                 """Return (v_mult, i_mult, code) adjustments for active anomalies."""
                 v_mult, i_mult, codes = 1.0, 1.0, []
                 for a in active:
-                    if phase != "replay" or progress < a.start_fraction:
+                    if phase != "replay":
                         continue
-                    local = (progress - a.start_fraction) / max(1e-6, 1 - a.start_fraction)
-                    strength = a.severity * (0.4 + 0.6 * local)
+                    start_idx = a.start_fraction * max(1, replay_n - 1)
+                    if live_idx < start_idx:
+                        continue
+                    # Transient faults are a short burst (a few samples) then CLEAR,
+                    # so the engine can Act and the Verifier confirms recovery within
+                    # its grace window -> AUTO-RESOLVED. A non-recovering fault persists
+                    # to the end -> escalated to a human.
+                    if getattr(a, "recovers", True):
+                        hold = max(1, round(getattr(a, "duration_fraction", 0.25) * replay_n))
+                        hold = min(hold, 1)  # clear within the Verifier grace window so it auto-resolves
+                        if live_idx > start_idx + hold:
+                            continue  # recovered: asset is healthy again
+                        strength = a.severity
+                    else:
+                        local = (progress - a.start_fraction) / max(1e-6, 1 - a.start_fraction)
+                        strength = a.severity * (0.4 + 0.6 * local)
                     a_role = _role_of(a.metric)
                     a_phase = _phase_of(a.metric)
                     if a_phase and target_phase and a_phase != target_phase:
@@ -291,10 +309,12 @@ def build_dataset(spec: DatasetSpec) -> FleetDataset:
             s_tot = sum(s_ph.values())
             p_tot = s_tot * pf
             q_tot = math.sqrt(max(0.0, s_tot ** 2 - p_tot ** 2))
-            if phase == "replay":
-                energy["active_energy"] += p_tot * dt_hours
-                energy["reactive_energy"] += q_tot * dt_hours
-                energy["apparent_energy"] += s_tot * dt_hours
+            # Energy registers accumulate continuously (history AND replay) so they
+            # are genuinely monotonic — the engine then excludes them from anomaly
+            # detection instead of mistaking their growth for a fault every sample.
+            energy["active_energy"] += p_tot * dt_hours
+            energy["reactive_energy"] += q_tot * dt_hours
+            energy["apparent_energy"] += s_tot * dt_hours
 
             out: dict[str, float] = {}
             for m in metrics:

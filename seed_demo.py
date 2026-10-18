@@ -47,14 +47,15 @@ def build_demo_dataset() -> FleetDataset:
     ]
     anomalies = [
         AnomalySpec(asset_id="MAIN-INCOMER", metric="voltage_a_v", kind="sag",
-                    start_fraction=0.55, severity=0.7,
-                    description="Phase-A voltage sag at the incomer during peak load."),
+                    start_fraction=0.45, severity=0.7, recovers=True,
+                    description="Phase-A voltage sag at the incomer during peak load (auto-corrected)."),
         AnomalySpec(asset_id="FEEDER-02", metric="current_a_a", kind="spike",
-                    start_fraction=0.65, severity=0.8,
-                    description="Overload current spike on feeder 2."),
-        AnomalySpec(asset_id="MOTOR-07", metric="thd_current_pct", kind="drift",
-                    start_fraction=0.5, severity=0.6,
-                    description="Rising current THD on motor 7 (harmonic distortion)."),
+                    start_fraction=0.6, severity=0.8, recovers=True,
+                    description="Overload current spike on feeder 2 (load shed and rebalanced)."),
+        AnomalySpec(asset_id="MOTOR-07", metric="current_a_a", kind="spike",
+                    start_fraction=0.5, severity=0.85, recovers=False,
+                    description="Sustained overload on motor 7 — auto-fix does not clear it, so it is "
+                                "escalated to an engineer."),
     ]
     spec = DatasetSpec(assets=assets, sample_interval_min=5, duration_days=2,
                        history_days=1, anomalies=anomalies)
