@@ -29,6 +29,31 @@ def _save_config(device_id: str, config: dict) -> None:
     datastore.set_doc(devices.live_path(device_id), "config", config)
 
 
+def _monitored_list(config: dict) -> list[dict]:
+    """Return the list of monitored params, migrating any legacy param_ids/thresholds."""
+    monitored = [dict(item) for item in (config.get("monitored") or [])]
+    if monitored:
+        return monitored
+    thresholds = config.get("thresholds") or {}
+    for pid in config.get("param_ids") or []:
+        limits = thresholds.get(f"p{pid}", {}) or {}
+        monitored.append({"pid": str(pid), "lower": limits.get("lower"),
+                          "upper": limits.get("upper"), "label": limits.get("label", "")})
+    return monitored
+
+
+def _persist_monitored(device_id: str, monitored: list[dict]) -> None:
+    config = _load_config(device_id)
+    config["monitored"] = monitored
+    config["param_ids"] = [m["pid"] for m in monitored]
+    config["thresholds"] = {
+        f"p{m['pid']}": {k: v for k, v in
+                         {"lower": m.get("lower"), "upper": m.get("upper"), "label": m.get("label")}.items()
+                         if v not in (None, "")}
+        for m in monitored if m.get("lower") is not None or m.get("upper") is not None or m.get("label")}
+    _save_config(device_id, config)
+
+
 def _render_config(device: dict) -> dict:
     device_id = device["id"]
     config = _load_config(device_id)
@@ -43,53 +68,62 @@ def _render_config(device: dict) -> dict:
     endpoint = st.text_input("REST endpoint (base — the param ID in the path is the template)",
                              value=config.get("endpoint", ""), disabled=simulated,
                              placeholder="https://10.130.178.92/rs/param/22120/value")
-    param_ids_text = st.text_area(
-        "Parameter IDs to monitor", disabled=simulated, height=90,
-        value="\n".join(str(p) for p in (config.get("param_ids") or [])),
-        help="One per line (or comma-separated). The agent polls /rs/param/<id>/value for each and "
-             "tracks its value. The ID already in the endpoint is always included.",
-        placeholder="22120\n22121\n22130\n22140")
-    param_ids = [p.strip() for p in re.split(r"[,\n]", param_ids_text) if p.strip()]
-    if not simulated and param_ids:
-        st.caption(f"Monitoring **{len(param_ids)}** parameter(s): {', '.join(param_ids[:20])}"
-                   + (" …" if len(param_ids) > 20 else "") + ". Only each param's `value` is tracked.")
     hex_as_float = st.selectbox(
         "Hex value format", ["IEEE-754 float (32-bit)", "Unsigned integer"],
         index=0 if config.get("hex_as_float", True) else 1, disabled=simulated,
         help="How to decode 0x.. hex words. Eaton meter params are IEEE-754 floats.") == "IEEE-754 float (32-bit)"
 
-    # Per-parameter lower/upper thresholds. Breaches raise described, escalating issues.
-    thresholds = dict(config.get("thresholds") or {})
+    # Monitored parameters: add one at a time (ID, lower, upper, label), listed below.
+    monitored = _monitored_list(config)
     if not simulated:
-        endpoint_pid_match = re.search(r"/rs/param/(\d+)/value", endpoint)
-        all_pids = list(dict.fromkeys(
-            ([endpoint_pid_match.group(1)] if endpoint_pid_match else []) + param_ids))
-        if all_pids:
-            with st.expander("🚦 Per-parameter thresholds (report an issue when breached)"):
-                st.caption("Set a lower and/or upper limit per parameter. When a value goes below the "
-                           "lower or above the upper limit, the agent raises an issue with a grounded "
-                           "description. Leave blank to use statistical anomaly detection only.")
-                new_thresholds: dict = {}
-                for pid in all_pids:
-                    existing = thresholds.get(pid, {}) or thresholds.get(f"p{pid}", {})
-                    row = st.columns([2, 2, 2, 3])
-                    row[0].markdown(f"**p{pid}**")
-                    lower = row[1].number_input("Lower", value=existing.get("lower"), key=f"lo_{pid}",
-                                                format="%.4f", step=1.0)
-                    upper = row[2].number_input("Upper", value=existing.get("upper"), key=f"hi_{pid}",
-                                                format="%.4f", step=1.0)
-                    label = row[3].text_input("Label (optional)", value=existing.get("label", ""),
-                                              key=f"lbl_{pid}", placeholder="e.g. Phase A voltage")
-                    entry = {}
-                    if lower is not None:
-                        entry["lower"] = float(lower)
-                    if upper is not None:
-                        entry["upper"] = float(upper)
-                    if label.strip():
-                        entry["label"] = label.strip()
-                    if entry:
-                        new_thresholds[f"p{pid}"] = entry
-                thresholds = new_thresholds
+        st.markdown("**Monitored parameters**")
+        st.caption("Add a parameter ID with optional lower/upper limits and a label. A value below the "
+                   "lower or above the upper limit raises an issue with a grounded description.")
+        head = st.columns([2, 2, 2, 3, 1])
+        for col, title in zip(head, ["Parameter ID", "Lower", "Upper", "Label", ""]):
+            col.caption(title)
+        for index, item in enumerate(monitored):
+            row = st.columns([2, 2, 2, 3, 1])
+            row[0].write(f"p{item['pid']}")
+            row[1].write("—" if item.get("lower") is None else f"{item['lower']:g}")
+            row[2].write("—" if item.get("upper") is None else f"{item['upper']:g}")
+            row[3].write(item.get("label") or "—")
+            if row[4].button("Remove", key=f"rm_param_{device_id}_{item['pid']}"):
+                monitored = [m for m in monitored if m["pid"] != item["pid"]]
+                _persist_monitored(device_id, monitored)
+                st.rerun()
+        add = st.columns([2, 2, 2, 3, 1])
+        new_pid = add[0].text_input("Parameter ID", key=f"newpid_{device_id}", label_visibility="collapsed",
+                                    placeholder="22120")
+        new_lower = add[1].number_input("Lower", key=f"newlo_{device_id}", value=None, step=1.0,
+                                        format="%.4f", label_visibility="collapsed")
+        new_upper = add[2].number_input("Upper", key=f"newhi_{device_id}", value=None, step=1.0,
+                                        format="%.4f", label_visibility="collapsed")
+        new_label = add[3].text_input("Label", key=f"newlbl_{device_id}", label_visibility="collapsed",
+                                      placeholder="e.g. Phase A voltage")
+        if add[4].button("➕ Add", key=f"addparam_{device_id}"):
+            pid = (new_pid or "").strip()
+            if not pid:
+                st.warning("Enter a parameter ID to add.")
+            elif any(m["pid"] == pid for m in monitored):
+                st.warning(f"Parameter {pid} is already monitored.")
+            else:
+                monitored.append({"pid": pid,
+                                  "lower": float(new_lower) if new_lower is not None else None,
+                                  "upper": float(new_upper) if new_upper is not None else None,
+                                  "label": (new_label or "").strip()})
+                _persist_monitored(device_id, monitored)
+                st.rerun()
+        if monitored:
+            st.caption(f"Monitoring **{len(monitored)}** parameter(s). Only each param's `value` is tracked.")
+        else:
+            st.info("No parameters added yet. Add at least one above.")
+
+    param_ids = [m["pid"] for m in monitored]
+    thresholds = {f"p{m['pid']}": {k: v for k, v in
+                                   {"lower": m.get("lower"), "upper": m.get("upper"),
+                                    "label": m.get("label")}.items() if v not in (None, "")}
+                  for m in monitored if m.get("lower") is not None or m.get("upper") is not None or m.get("label")}
 
     col1, col2, col3 = st.columns(3)
     auth_modes = ["none", "basic", "digest", "bearer"]
@@ -148,7 +182,7 @@ def _render_config(device: dict) -> dict:
         config.update({"simulated": simulated, "endpoint": endpoint, "auth_mode": auth_mode,
                        "interval": interval, "field_map": field_map, "sample": sample,
                        "secret_ref": secret_ref, "verify_tls": verify_tls, "param_ids": param_ids,
-                       "hex_as_float": hex_as_float, "thresholds": thresholds,
+                       "hex_as_float": hex_as_float, "thresholds": thresholds, "monitored": monitored,
                        "ca_cert_ref": ca_ref if (ca_pem.strip() or config.get("ca_cert_ref")) else None})
         _save_config(device_id, config)
         if not simulated and auth_mode != "none" and not cred_saved and not secretmgr.get_secret(secret_ref):
@@ -162,6 +196,7 @@ def _render_config(device: dict) -> dict:
     config["endpoint"] = endpoint
     config["hex_as_float"] = hex_as_float
     config["thresholds"] = thresholds
+    config["monitored"] = monitored
     return config
 
 

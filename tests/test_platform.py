@@ -317,9 +317,8 @@ class LiveAdapterTests(PlatformTestBase):
             return FakeResponse(responses[pid])
 
         with patch("live.rest_adapter.requests.get", side_effect=fake_get):
-            # Endpoint's own id (22120) auto-included; only 22121 listed explicitly.
             reading = rest_adapter.poll("rest", {"endpoint": "https://x/rs/param/22120/value",
-                                                 "auth_mode": "none", "param_ids": ["22121"]})
+                                                 "auth_mode": "none", "param_ids": ["22120", "22121"]})
         self.assertEqual(reading["metrics"]["p22120"], 10.0)
         self.assertEqual(reading["metrics"]["p22121"], 20.0)
         # The echoed pid field is NOT tracked — only value.

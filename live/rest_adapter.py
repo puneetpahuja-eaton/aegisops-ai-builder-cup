@@ -184,8 +184,10 @@ def poll_params(config: dict) -> dict:
     if not match:
         return poll_rest(config)
     param_ids = [str(pid).strip() for pid in config.get("param_ids") or [] if str(pid).strip()]
-    # Always include the id already in the endpoint, de-duplicated and order-preserving.
-    param_ids = list(dict.fromkeys([match.group(2), *param_ids]))
+    # Use the explicit list when provided; otherwise fall back to the endpoint's own id.
+    if not param_ids:
+        param_ids = [match.group(2)]
+    param_ids = list(dict.fromkeys(param_ids))
 
     merged: dict[str, float] = {}
     raw: dict[str, Any] = {}
