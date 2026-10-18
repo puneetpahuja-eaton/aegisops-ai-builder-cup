@@ -48,7 +48,7 @@ def main() -> None:
     if not any(account["email"] == BUILD_ACCOUNT for account in accounts):
         gcloud("iam", "service-accounts", "create", "aegisops-builder", f"--project={PROJECT}", "--display-name=AegisOps builds")
     gcloud("projects", "add-iam-policy-binding", PROJECT, f"--member=serviceAccount:{BUILD_ACCOUNT}", "--role=roles/run.builder", "--condition=None")
-    for role in ("roles/aiplatform.user", "roles/bigquery.jobUser"):
+    for role in ("roles/aiplatform.user", "roles/bigquery.jobUser", "roles/datastore.user", "roles/secretmanager.secretAccessor"):
         gcloud("projects", "add-iam-policy-binding", PROJECT, f"--member=serviceAccount:{ACCOUNT}", f"--role={role}", "--condition=None")
     print("Runtime service account and project roles configured.")
     storage_client = storage.Client(project=PROJECT, credentials=auth)
@@ -61,9 +61,9 @@ def main() -> None:
         bucket = storage_client.create_bucket(bucket, location=REGION)
     policy = bucket.get_iam_policy(requested_policy_version=3)
     member = f"serviceAccount:{ACCOUNT}"
-    binding = next((item for item in policy.bindings if item["role"] == "roles/storage.objectViewer"), None)
+    binding = next((item for item in policy.bindings if item["role"] == "roles/storage.objectAdmin"), None)
     if binding is None:
-        policy.bindings.append({"role": "roles/storage.objectViewer", "members": {member}})
+        policy.bindings.append({"role": "roles/storage.objectAdmin", "members": {member}})
     else:
         binding["members"].add(member)
     bucket.set_iam_policy(policy)

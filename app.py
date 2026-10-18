@@ -1,6 +1,8 @@
 """Kairos AI — multi-device AI reliability platform (role-based, Google Cloud)."""
 from __future__ import annotations
 
+import os
+
 import streamlit as st
 
 import netsetup
@@ -14,6 +16,25 @@ from views import (analysis, chat, data_sources, device_manager, integrations,
                    live_monitoring, simulate, user_admin)
 
 ui_common.configure()
+
+_demo_seeded = False
+
+
+def _maybe_seed_demo() -> None:
+    """Seed a populated demo device once per process when SEED_DEMO=1.
+
+    Runs in-cloud where Firestore is reachable; never raises so it cannot block
+    startup. Idempotent (skips if the demo device already exists).
+    """
+    global _demo_seeded
+    if _demo_seeded or os.getenv("SEED_DEMO") != "1":
+        return
+    _demo_seeded = True
+    try:
+        import seed_demo
+        seed_demo.ensure_demo()
+    except Exception:
+        pass
 
 
 def home() -> None:
@@ -67,6 +88,7 @@ def _build_navigation(role: str):
 
 
 def main() -> None:
+    _maybe_seed_demo()
     if not ui_common.current_user():
         ui_common.login_view()
         return
