@@ -1,19 +1,23 @@
-# Verification record | October 17, 2026
+# Verification record | October 18, 2026
 
 ## Multi-device platform (current)
 
 - The app is now a role-gated multi-page platform (`app.py` → `st.navigation`).
   Roles admin/engineer/viewer are enforced; passwords are PBKDF2-hashed.
-- 81 unittest/Streamlit AppTest regressions pass with Python 3.11.9: the 54 PRISM
-  engine/parity/fleet tests, 23 platform tests (auth, datastore, devices,
-  ingestion, RAG, live monitor, REST adapter, integrations parsers, device data)
-  and 4 app-shell smoke tests.
+- 121 unittest/Streamlit AppTest regressions pass with Python 3.11.9, covering
+  the PRISM engine/parity/fleet suite plus platform tests (auth, datastore,
+  devices, ingestion, RAG, live monitor, REST adapter, integrations parsers,
+  device data, dataset generation, monitor-plan generation, the live→engine
+  bridge) and app-shell smoke tests.
 - Verified end-to-end in a real browser (offline/local mode, no credentials):
   login as admin → add device → ingest a source (RAG corpus) → open Analysis
   (the embedded PRISM dashboard with all six original tabs, scoped to the device,
   stepping telemetry) → grounded chat answer with a citation → Live Monitoring
   with the built-in simulated REST feed streaming readings and auto-detecting /
   auto-resolving an injected anomaly with estimated cost avoided.
+- Verified on Cloud Run (`kairos-ai` service, real credentials): login seeded and
+  authenticated against **Firestore**, Model backend **Vertex AI**, all role-gated
+  pages render with zero exceptions. Store backend reports `firestore`.
 - The platform runs with no cloud credentials via a local JSON store and offline
   reasoning (clearly labeled, never presented as Google AI). With Firestore,
   Secret Manager, Vertex AI, Cloud Storage and BigQuery configured it uses those.
@@ -21,8 +25,11 @@
   the participant's API keys / device endpoint; parsers and adapters are unit
   tested, and credentials are stored in Secret Manager, never in device records.
 
-Pending for submission: deploy the platform revision to Cloud Run, re-record the
-demo video for the new multi-device flow, and refresh the proposal deck.
+Deployed: `https://kairos-ai-498775210896.asia-south1.run.app`
+(revision `kairos-ai-00001-wvb`), Firestore-backed, Gemini on Vertex AI.
+Proposal deck refreshed for the multi-device platform. Pending for submission:
+re-record the sub-3-minute demo video for the new multi-device flow and upload it
+to a public host.
 
 ## Original PRISM / Google Cloud edition (analysis engine)
 
@@ -52,7 +59,7 @@ demo video for the new multi-device flow, and refresh the proposal deck.
   zero avoided cost and reported no diagnosis accuracy without ground truth.
 - Invalid replacement data was rejected visibly without changing the active run.
   Neither synthetic nor uploaded paths sent equipment commands.
-- Current deployed application revision: `aegis-ops-00010-kph`.
+- Current deployed application revision: `kairos-ai-00001-wvb` (service `kairos-ai`).
 - Reproduce with `node submission/verify-prism.mjs` locally or add `--live`.
   Only synthetic template data was used for cloud checks. Screenshots and
   machine-readable results are generated under ignored `submission/media/`.

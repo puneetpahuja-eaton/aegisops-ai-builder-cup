@@ -24,43 +24,39 @@ def slides():
         accepted = sum(case["diagnosis"]["_source"].startswith("gemini:") for case in cases)
         verified = f"Recorded live smoke test: {accepted}/{len(cases)} accepted Gemini diagnoses. This is not accuracy on a labeled production dataset."
     return [
-        ("PRISM | Google Cloud edition", "Original fleet workflow, grounded operational assistance", [
-            "Manufacturing | Intelligent Operations & Industrial Efficiency",
-            "For plant supervisors and reliability engineers: turn fragmented alarms and sensor readings into a traceable incident brief.",
-            "Original 22-asset PRISM simulator and six-tab UI. No equipment control or measured production savings.",
+        ("Kairos AI", "Agentic reliability for manufacturing: catch the critical moment before downtime", [
+            "Theme: Manufacturing | Intelligent Operations & Industrial Efficiency.",
+            "For plant reliability teams: onboard any device, learn from its documents and data, and turn telemetry into cited, actionable diagnoses.",
+            "Built during the AI Builder Cup on Google Cloud: Gemini on Vertex AI, Vertex embeddings, Firestore, Cloud Storage, BigQuery, Secret Manager and Cloud Run.",
         ]),
-        ("The problem and the narrow wedge", "One upstream fault should not become twenty tickets", [
-            "Fleet triage for plant equipment and its power chain, with chronological telemetry replacement.",
-            "Group downstream supply symptoms without hiding independent bearing, pressure or battery risks.",
-            "Product hypothesis: trained evidence, topology and a cited engineer handoff reduce gathering effort.",
-            "Validate this hypothesis with an approved pilot; no invented customer or market statistics.",
+        ("The problem", "Diagnosis is the bottleneck, not detection", [
+            "Alarms tell an engineer what changed, not what to review next; the knowledge is scattered across manuals, registers and event logs.",
+            "One upstream fault becomes many tickets, and triage stays slow and tribal.",
+            "Hypothesis: grounded evidence, an agentic engine and a cited engineer handoff cut triage effort - to be proven in an approved pilot, not assumed.",
         ]),
-        ("A complete, reviewable workflow", "Monitor -> Diagnose -> Decide -> Act -> Verify", [
-            "Monitor: original history-trained robust-z + Isolation Forest and Markov event-pattern tools.",
-            "Diagnose: original topology correlation, plus Vertex AI hypotheses and validated SOP passages.",
-            "Decide/Act: original reversibility/confidence policy; automatic actions only change the simulator.",
-            "Verify: original subsequent-sample verifier and three-sample grace period. Uploaded data is observation-only.",
-            "Exact offline parity: all 96 snapshots, case fields, model outputs and counterfactuals match PRISM.",
+        ("What it does", "Onboard -> Learn -> Analyze -> Act, live or historic", [
+            "Devices: register any asset and upload datasheets and registers; retrieval runs over Vertex embeddings with a per-device Firestore corpus (RAG).",
+            "Agentic chat with Ask / Plan / Agent modes: it clarifies, plans, then generates datasets, test cases, code and live-monitoring plans.",
+            "Five-agent engine (Monitor -> Diagnose -> Decide -> Act -> Verify) scores uploaded datasets and live REST streams through one code path.",
+            "Live monitoring: the agent reads the datasheet to pick parameters and thresholds, decodes event logs, and streams readings into the same engine.",
         ]),
-        ("Google Cloud architecture", "Real services, not decorative integrations", [
-            "Cloud Run: deployed application, scale-to-zero, one-instance demo limit.",
-            "Gemini on Vertex AI: structured incident reasoning and work-order drafting.",
-            "Cloud Storage: private SOP and synthetic scenario documents.",
-            "BigQuery: partitioned audit table, 30-day retention, bounded history query.",
-            "Dedicated runtime service account; no API key embedded in the cloud service.",
+        ("Google Cloud architecture", "Real services, service-account identity, no embedded keys", [
+            "Cloud Run: deployed app, scale-to-zero, runs as a dedicated service account via ADC.",
+            "Gemini on Vertex AI: grounded reasoning, generation and structured output.",
+            "Vertex embeddings + Firestore: per-device knowledge corpus and durable platform state (users, devices, sources, chunks).",
+            "Cloud Storage + BigQuery: telemetry and datasets, plus a partitioned audit table with 30-day retention.",
         ]),
-        ("Validation and honest limitations", "Make failures visible; do not manufacture success", [
-            "Regression tests exercise approval, invalid output, bad citations, missing evidence, reopened cases, storage failure and rejected audit rows.",
-            verified or "Live-cloud verification is required before submission; do not claim it until recorded.",
-            "Quote checks establish textual provenance, not proof of every causal claim. Model confidence is self-reported.",
-            "Built-in assets/SOPs are synthetic. Original value fields are assumed counterfactuals, not realized savings.",
+        ("Innovation and honesty", "Beyond a chatbot on a dashboard", [
+            "Datasheet-driven monitoring: the agent derives parameter IDs, thresholds and event-log decoding from the device's own documents.",
+            "One engine, two modes: identical diagnosis for historic datasets and for a live warm-up then stream.",
+            "Physically-consistent synthetic data with ground-truth scenarios scores diagnosis accuracy, downtime and cost avoided.",
+            "Honest by design: offline fallbacks are labeled and never shown as Gemini; data is synthetic; humans approve actions.",
         ]),
-        ("Impact, feasibility and the next step", "Start with one approved workflow at one plant", [
-            "Pilot measures: manual-vs-assisted triage time, engineer acceptance, unsupported claims and appropriate escalation.",
-            "Use approved site procedures, qualified industrial review, tenant isolation and authenticated access before any production pilot.",
-            "Scale documents and audit across sites; add real monitoring ingestion only after validation.",
-            "Future roadmap only: Pub/Sub, Dataflow and hosted predictive workloads.",
-            "Submission: deployed demo + public source + this PDF + video strictly under three minutes.",
+        ("Impact, feasibility and next step", "Start with one approved workflow at one plant", [
+            "Impact: faster triage, consolidated tickets, and device knowledge made accessible to every engineer; scales device-by-device and site-by-site.",
+            verified or "Validation: 121 automated tests cover auth, RAG, generation, the engine and the live bridge. Live-cloud checks are recorded, not claimed as production accuracy.",
+            "Pilot measures manual-vs-assisted triage time, engineer acceptance and appropriate escalation; no invented savings or market statistics.",
+            "Submission: deployed link + public repository + this deck + a video strictly under three minutes.",
         ]),
     ]
 

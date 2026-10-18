@@ -16,18 +16,16 @@ MEDIA = HERE / "media"
 def main():
     MEDIA.mkdir(exist_ok=True)
     document = pymupdf.open(HERE / "Kairos-AI-Proposal.pdf")
-    for index in (0, 3, 5):
-        document[index].get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5)).save(MEDIA / f"slide-{index + 1}.png")
+    for index in range(6):
+        document[index].get_pixmap(matrix=pymupdf.Matrix(2.0, 2.0)).save(MEDIA / f"slide-{index + 1}.png")
     document.close()
     scenes = [
-        ("slide-1.png", "Real cloud application | Edited screen sequence | Synthetic data", 20),
-        ("slide-4.png", "Implemented: Cloud Run + Vertex AI + Cloud Storage + BigQuery", 20),
-        ("motor-evidence.png", "1. Monitor: numerical evidence, not a failure forecast", 18),
-        ("motor-diagnosis.png", "2. Gemini hypothesis: validated source references", 25),
-        ("approval.png", "3-5. Named human approval and synthetic verification", 25),
-        ("pump-work-order.png", "Engineer escalation and review-only work order", 25),
-        ("audit-history.png", "BigQuery audit history | Exportable report", 17),
-        ("slide-6.png", "No production savings claimed | Next: engineer-validated pilot", 15),
+        ("slide-1.png", "Agentic reliability on Google Cloud | Synthetic data | No real equipment control", 16),
+        ("slide-2.png", "The problem: diagnosis is the bottleneck, not detection", 20),
+        ("slide-3.png", "Onboard, learn (RAG), ask the device, analyze live or historic", 36),
+        ("slide-4.png", "Cloud Run + Gemini on Vertex AI + Vertex embeddings + Firestore + BigQuery", 30),
+        ("slide-5.png", "Datasheet-driven monitoring | One engine, live and historic | Honest by design", 30),
+        ("slide-6.png", "No production savings claimed | 121 tests | Next: engineer-validated pilot", 18),
     ]
     font = ImageFont.truetype("C:\\Windows\\Fonts\\arial.ttf", 28)
     frames = []

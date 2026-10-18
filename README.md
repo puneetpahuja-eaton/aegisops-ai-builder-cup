@@ -6,8 +6,21 @@ agentic engine, and answers questions in a grounded Gemini chat. Built on Google
 Cloud: Gemini on Vertex AI, Vertex AI embeddings, Firestore, Cloud Storage,
 BigQuery, Secret Manager and Cloud Run.
 
-- Live application: https://aegis-ops-498775210896.asia-south1.run.app
+- Live application: https://kairos-ai-498775210896.asia-south1.run.app
 - Source: https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
+
+## Scope and provenance
+
+Built for the **Manufacturing** theme of the Google Cloud AI Builder Cup. The
+Kairos AI platform in this repository — authentication and roles, per-device
+retrieval (RAG) over Vertex AI embeddings and Firestore, the agentic
+Ask / Plan / Agent assistant, the generative dataset and live-monitoring
+builders, the unified live-and-historic diagnostic engine, and the full Google
+Cloud deployment (Cloud Run, Gemini on Vertex AI, Cloud Storage, BigQuery,
+Secret Manager) — was developed during the hackathon window. It builds on a
+team-authored power-reliability diagnostic method, disclosed transparently
+rather than presented as new. All telemetry, datasheets and procedures used in
+the demo are synthetic; the system never controls real equipment.
 
 ## What it does
 

@@ -11,13 +11,15 @@
 - [x] Local narrated demo draft generated and duration verified: 165 seconds.
 - [x] All materials are in English.
 
-Live URL: https://aegis-ops-498775210896.asia-south1.run.app
+Live URL: https://kairos-ai-498775210896.asia-south1.run.app
 
 Source: https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
 
 PDF: `Kairos-AI-Proposal.pdf`
 
-Video draft: `Kairos-AI-Demo.mp4` (local, not yet uploaded to an accepted host).
+Video draft: `Kairos-AI-Demo.mp4` (narrated overview, refreshed for the
+multi-device platform, 165 s). Replace with a live screen recording of the
+deployed app for best marks, then upload to a public host (YouTube/Vimeo/Drive).
 
 ## Participant tasks
 
