@@ -176,6 +176,34 @@ class LiveMonitorTests(PlatformTestBase):
         monitor.observe({"metrics": {"load_pct": 61.0}, "codes": ["BREAKER_OPEN"]})
         self.assertEqual(monitor.summary()["escalated"], 1)
 
+    def test_threshold_breach_raises_issue_and_auto_resolves(self):
+        monitor = LiveMonitor(criticality="low", thresholds={"p22120": {"lower": 220.0, "upper": 240.0,
+                                                                        "label": "Phase A V"}})
+        monitor.observe({"metrics": {"p22120": 230.0}})  # within limits
+        self.assertEqual(monitor.summary()["issues"], 0)
+        new = monitor.observe({"metrics": {"p22120": 250.0}})  # above upper
+        self.assertEqual(len(new), 1)
+        self.assertIn("above upper", new[0]["reason"])
+        self.assertEqual(new[0]["label"], "Phase A V")
+        self.assertEqual(new[0]["status"], "MONITORING")
+        monitor.observe({"metrics": {"p22120": 231.0}})  # back within limits
+        summary = monitor.summary()
+        self.assertEqual(summary["auto_resolved"], 1)
+        self.assertGreater(summary["cost_avoided_usd"], 0)
+
+    def test_persistent_breach_escalates(self):
+        monitor = LiveMonitor(criticality="low", escalate_after=3,
+                              thresholds={"p1": {"lower": 10.0}})
+        for _ in range(4):
+            monitor.observe({"metrics": {"p1": 5.0}})  # stays below lower
+        self.assertEqual(monitor.summary()["escalated"], 1)
+
+    def test_multiword_metric_inherits_param_threshold(self):
+        monitor = LiveMonitor(thresholds={"p1": {"upper": 100.0}})
+        new = monitor.observe({"metrics": {"p1.0": 150.0}})
+        self.assertEqual(len(new), 1)
+        self.assertIn("above upper", new[0]["reason"])
+
 
 class LiveAdapterTests(PlatformTestBase):
     def test_disabled_protocols(self):

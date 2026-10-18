@@ -8,6 +8,7 @@ import streamlit as st
 
 import datastore
 import devices
+import rag
 import secretmgr
 import ui_common
 from live import rest_adapter, sim_feed
@@ -56,6 +57,40 @@ def _render_config(device: dict) -> dict:
         "Hex value format", ["IEEE-754 float (32-bit)", "Unsigned integer"],
         index=0 if config.get("hex_as_float", True) else 1, disabled=simulated,
         help="How to decode 0x.. hex words. Eaton meter params are IEEE-754 floats.") == "IEEE-754 float (32-bit)"
+
+    # Per-parameter lower/upper thresholds. Breaches raise described, escalating issues.
+    thresholds = dict(config.get("thresholds") or {})
+    if not simulated:
+        endpoint_pid_match = re.search(r"/rs/param/(\d+)/value", endpoint)
+        all_pids = list(dict.fromkeys(
+            ([endpoint_pid_match.group(1)] if endpoint_pid_match else []) + param_ids))
+        if all_pids:
+            with st.expander("🚦 Per-parameter thresholds (report an issue when breached)"):
+                st.caption("Set a lower and/or upper limit per parameter. When a value goes below the "
+                           "lower or above the upper limit, the agent raises an issue with a grounded "
+                           "description. Leave blank to use statistical anomaly detection only.")
+                new_thresholds: dict = {}
+                for pid in all_pids:
+                    existing = thresholds.get(pid, {}) or thresholds.get(f"p{pid}", {})
+                    row = st.columns([2, 2, 2, 3])
+                    row[0].markdown(f"**p{pid}**")
+                    lower = row[1].number_input("Lower", value=existing.get("lower"), key=f"lo_{pid}",
+                                                format="%.4f", step=1.0)
+                    upper = row[2].number_input("Upper", value=existing.get("upper"), key=f"hi_{pid}",
+                                                format="%.4f", step=1.0)
+                    label = row[3].text_input("Label (optional)", value=existing.get("label", ""),
+                                              key=f"lbl_{pid}", placeholder="e.g. Phase A voltage")
+                    entry = {}
+                    if lower is not None:
+                        entry["lower"] = float(lower)
+                    if upper is not None:
+                        entry["upper"] = float(upper)
+                    if label.strip():
+                        entry["label"] = label.strip()
+                    if entry:
+                        new_thresholds[f"p{pid}"] = entry
+                thresholds = new_thresholds
+
     col1, col2, col3 = st.columns(3)
     auth_modes = ["none", "basic", "digest", "bearer"]
     auth_mode = col1.selectbox("Auth", auth_modes,
@@ -113,7 +148,7 @@ def _render_config(device: dict) -> dict:
         config.update({"simulated": simulated, "endpoint": endpoint, "auth_mode": auth_mode,
                        "interval": interval, "field_map": field_map, "sample": sample,
                        "secret_ref": secret_ref, "verify_tls": verify_tls, "param_ids": param_ids,
-                       "hex_as_float": hex_as_float,
+                       "hex_as_float": hex_as_float, "thresholds": thresholds,
                        "ca_cert_ref": ca_ref if (ca_pem.strip() or config.get("ca_cert_ref")) else None})
         _save_config(device_id, config)
         if not simulated and auth_mode != "none" and not cred_saved and not secretmgr.get_secret(secret_ref):
@@ -126,6 +161,7 @@ def _render_config(device: dict) -> dict:
     config["param_ids"] = param_ids
     config["endpoint"] = endpoint
     config["hex_as_float"] = hex_as_float
+    config["thresholds"] = thresholds
     return config
 
 
@@ -160,7 +196,8 @@ def render() -> None:
 
     col1, col2, col3 = st.columns(3)
     if col1.button("▶ Start", type="primary", disabled=st.session_state[on_key]):
-        st.session_state[mon_key] = LiveMonitor(criticality=device["criticality"])
+        st.session_state[mon_key] = LiveMonitor(criticality=device["criticality"],
+                                                thresholds=config.get("thresholds") or {})
         st.session_state[hist_key] = []
         st.session_state[f"live_step_{device_id}"] = 0
         st.session_state[on_key] = True
@@ -188,7 +225,16 @@ def render() -> None:
                 st.error(f"Poll failed: {error}")
                 st.session_state[on_key] = False
                 return
-            monitor.observe(reading)
+            new_issues = monitor.observe(reading)
+            # Enrich newly raised issues with a grounded description (once each).
+            for issue in new_issues:
+                try:
+                    issue["description"] = rag.describe_issue(
+                        device_id, param=issue.get("label") or issue["metric"], value=issue["value"],
+                        reason=issue.get("reason", "anomaly"), lower=issue.get("lower"),
+                        upper=issue.get("upper"))
+                except Exception as error:  # noqa: BLE001
+                    issue["description"] = f"(description unavailable: {error})"
             st.session_state[hist_key].append({"timestamp": reading["timestamp"], **reading["metrics"]})
             st.session_state[hist_key] = st.session_state[hist_key][-120:]
             st.session_state[f"live_lastraw_{device_id}"] = reading.get("raw")
@@ -219,7 +265,20 @@ def render() -> None:
                 st.line_chart(frame)
         if monitor.issues:
             st.subheader("Detected issues")
-            st.dataframe(list(reversed(monitor.issues)), hide_index=True, width="stretch")
+            _badge = {"ESCALATED": "🔴", "MONITORING": "🟠", "RESOLVED": "🟢"}
+            for issue in reversed(monitor.issues):
+                badge = _badge.get(issue["status"], "⚪")
+                with st.container(border=True):
+                    top = st.columns([3, 2, 2, 2])
+                    top[0].markdown(f"{badge} **{issue.get('label', issue['metric'])}**")
+                    top[1].write(f"value: {issue['value']}")
+                    top[2].write(f"{issue['status']}")
+                    top[3].write(f"{issue['decision']}")
+                    st.caption(f"{issue.get('reason', '')}"
+                               + (f" · est. cost avoided ${issue['cost_avoided_usd']:,.0f}"
+                                  if issue.get("cost_avoided_usd") else ""))
+                    if issue.get("description"):
+                        st.write(issue["description"])
         raw = st.session_state.get(f"live_lastraw_{device_id}")
         if raw is not None and not config.get("simulated", True):
             with st.expander("🔎 Latest raw device response"):
