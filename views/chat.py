@@ -17,10 +17,11 @@ import rag
 import ui_common
 
 _QUICK_ACTIONS = {
-    "📊 Historic dataset": "Create a synthetic historic dataset (CSV) of the key measured parameters for "
-                           "this device (e.g. voltage and current per phase) over 100 five-minute samples, "
-                           "with a realistic daily pattern and a couple of labelled anomalies. Return it as "
-                           "a ```csv block with a header row, and briefly describe the schema.",
+    "📊 Historic dataset": "Create a small synthetic historic dataset (CSV) of the key measured parameters "
+                           "for this device (e.g. voltage and current per phase) over about 24 five-minute "
+                           "samples, with a realistic daily pattern and one labelled anomaly. Return it as a "
+                           "```csv block with a header row, and briefly describe the schema. For a larger, "
+                           "loadable dataset, tell the user to use 'Build a dataset for Analysis' above.",
     "🧪 Test cases": "Generate a set of test cases for this device's key behaviours and alarm/threshold "
                      "logic based on its documentation. Return them as a ```markdown table with columns: "
                      "ID, Scenario, Steps, Expected result. Note any assumptions.",
@@ -93,11 +94,20 @@ def _dataset_builder(device_id: str) -> None:
         req_key = f"ds_req_{device_id}"
         request = st.text_area("What dataset do you want?", key=req_key, height=90,
                                placeholder="e.g. metering dataset with per-phase voltages, currents, active/"
-                                           "reactive/apparent power and energies for the last 3 days")
+                                           "reactive/apparent power and energies")
         ref_path = st.text_input("Reference a repo file for parameters (optional path)", key=ref_key,
                                  placeholder="source/Tools/RTK DCI DB Creator.xlsm",
                                  help="Pulled from this device's linked GitHub repo and used as the "
                                       "authoritative parameter list. Supports .xlsm/.xlsx/.csv/text.")
+        span_cols = st.columns(2)
+        days = span_cols[0].number_input("How many days of data?", min_value=1, max_value=14,
+                                         value=3, step=1, key=f"ds_days_{device_id}",
+                                         help="Total span of the dataset to synthesize.")
+        interval_min = span_cols[1].number_input("Sample every (minutes)?", min_value=1, max_value=1440,
+                                                 value=5, step=1, key=f"ds_interval_{device_id}",
+                                                 help="Sampling rate — a reading every N minutes.")
+        est_rows = int(days) * (24 * 60 // max(1, int(interval_min)))
+        st.caption(f"≈ {est_rows:,} rows per asset at {int(interval_min)}-minute sampling over {int(days)} day(s).")
         cols = st.columns(3)
         if cols[0].button("❓ Ask clarifying questions", disabled=not request.strip(), key=f"ds_ask_{device_id}"):
             with st.spinner("Loading reference and thinking..."):
@@ -119,6 +129,10 @@ def _dataset_builder(device_id: str) -> None:
                     reference = _load_reference(device_id, ref_path)
                     spec = dataset_gen.generate_spec(_dataset_context(device_id), request, reference,
                                                      st.session_state.get(f"ds_answers_{device_id}", ""))
+                    # User-selected span and sampling rate are authoritative.
+                    spec["duration_days"] = int(days)
+                    spec["sample_interval_min"] = int(interval_min)
+                    spec.setdefault("history_days", max(1, int(days) // 2 or 1))
                     dataset = dataset_gen.build_dataset(dataset_gen.DatasetSpec.model_validate(spec))
                 except Exception as error:  # noqa: BLE001
                     st.error(f"Dataset generation failed: {error}")

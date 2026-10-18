@@ -212,7 +212,7 @@ def converse(device_id: str, query: str, *, mode: str = "ask", screen_context: s
         f"Context passages:\n{context}{screen}\n\nUser message: {query}"
     )
     try:
-        result = generate_json(prompt, ModeResponse)
+        result = generate_json(prompt, ModeResponse, max_output_tokens=16384)
     except ModelUnavailable as error:
         return {"answer": f"Google AI is unavailable right now: {error}", "needs_clarification": False,
                 "clarifying_questions": [], "awaiting_confirmation": False, "artifacts": [],

@@ -1,58 +1,62 @@
-# Kairos AI — 3-Minute Demo Video Script
+# Kairos AI — Demo Video Script (story-first, ~3:45)
 
-Target pace: ~155 words/min. Speak clearly and with energy. Pause ~0.5s between sentences.
+Target ~3:45 (rules allow 3-4 min). Pace ~160 words/min. Speak with conviction - this is a story, not a feature list.
+Part 1 = YOU speaking the problem + solution + features (on camera, or voiceover over the matching screens).
+Part 2 = LIVE demo + Google Cloud stack + results. End on a high note.
 
-## Pre-recording checklist (stage these BEFORE you record)
-- [ ] Logged in to the deployed app as `admin@kairos.ai` on the public URL.
-- [ ] Demo device **"Demo - Power Distribution Panel"** present (3 assets, dataset mode).
-- [ ] One GitHub repo **already ingested** so **Integrations -> Saved knowledge links** shows it.
-- [ ] One Confluence page already ingested (shows in Saved knowledge links).
-- [ ] In **Ask the device**: a dataset already generated (so you can show the result instantly).
-- [ ] In **Live Monitoring**: a monitoring plan already built; ready to click **Start**.
-- [ ] Browser zoomed so text is readable; sidebar expanded; 1080p screen recording.
-- [ ] Record in 3 one-minute segments; stitch together. Keep each click smooth.
+## Pre-recording checklist
+- [ ] Deployed app open, logged in as `admin@kairos.ai`.
+- [ ] Demo device **"Demo - Power Distribution Panel"** ready (3 assets).
+- [ ] GitHub repo + Confluence page ingested (Integrations -> Saved knowledge links).
+- [ ] Ask the device: a dataset already generated.
+- [ ] Live Monitoring: **Use built-in simulated feed** ON + **Deep analysis** ticked (ready to Start).
+- [ ] 1080p, readable zoom, sidebar expanded. Record in segments; stitch.
 
 ---
 
-## MINUTE 1 (0:00-1:00) - Problem - Social impact - Solution - Agents - Start analysis
+## (OPTIONAL) Intro — 0:00-0:08
+| SHOW | SAY |
+|---|---|
+| You on camera / cover | "Hi, I'm Puneet Pahuja, team lead of Kairos AI, with Khushboo Verma and Anurag Verma. Let me tell you why we built this." |
+*(If you use this, everything below shifts ~8 seconds; total stays within 4:00.)*
+
+---
+
+## PART 1 — THE STORY (you speaking) ~0:00-2:00
 
 | Time | SHOW ON SCREEN | SAY (word-for-word) |
 |---|---|---|
-| 0:00-0:12 | Cover slide (or app Home) | "Power devices run our hospitals, water plants, factories and telecom. But when one fails, finding the fault still needs an engineer physically on site - and by the time they arrive, the downtime has already cost thousands." |
-| 0:12-0:22 | Cover / problem visual | "Expert reliability engineers are scarce, and they can't be everywhere at once. That delay is the real problem - and it hits the communities that depend on reliable power the hardest." |
-| 0:22-0:35 | App Home - "Kairos AI" header | "Meet Kairos AI - an expert reliability engineer inside every device. It learns each device from its own documents, watches it remotely around the clock, and diagnoses and resolves faults in seconds - not site visits." |
-| 0:35-0:52 | Agents diagram (deck slide 3) | "Under the hood, five agents work as a closed loop. Monitor detects anomalies. Diagnose finds the root cause with cited evidence from the device's manuals. Decide weighs confidence and risk. Act self-heals reversible faults or escalates to a human. And Verify confirms the fix and scores the downtime and cost avoided." |
-| 0:52-1:00 | Analysis page -> select **Demo - Power Distribution Panel** -> click Run (it starts stepping) | "It all runs on Google Cloud with Gemini on Vertex AI. Let me start an analysis on our demo panel now - it'll run while I show you the platform." |
+| 0:00-0:28 | You on camera / power-outage & hospital imagery / cover | "Think about the last time your power went out - that sudden silence, that small moment of helplessness. Now imagine it isn't your home. It's a hospital mid-surgery. A water plant for an entire city. A factory line that just stopped cold. Behind each one is a power device that failed - and an engineer who has to drop everything, drive to the site, and find out what went wrong. Every minute on the road, the cost climbs and the risk grows." |
+| 0:28-0:45 | Problem visual / stay on camera | "Here's the hard truth: today, finding the fault still needs a human physically there. The device only raises an alarm - it can't tell you why it failed, or how to recover. Expert engineers are rare, and they can't be everywhere at once. So the world waits - in the dark." |
+| 0:45-1:02 | Kairos AI Home / logo | "So we asked one simple question: what if every device could explain itself - and heal itself? That's Kairos AI. We put an expert reliability engineer inside every power device. It learns each device from its own manuals, watches it around the clock, and diagnoses and resolves faults in seconds - remotely." |
+| 1:02-1:15 | Device Manager + Data Sources | "Getting started is simple. You onboard any device - a panelboard, a meter, a UPS - and feed it knowledge: upload datasheets, or pull straight from GitHub and Confluence. Kairos AI reads and remembers every page." |
+| 1:15-1:40 | Ask the device (show 3 modes + a generated artifact) | "The heart of Kairos AI is 'Ask the device.' Think of it as a personal assistant that knows everything about your device. Ask it anything - what went wrong, how to recover, what a reading means. Or ask it to generate a historic dataset, test cases, a summary, even a complete live-monitoring plan. Three modes - Ask, Plan, and Agent - so it can answer you, plan with you, or go and do the work itself." |
+| 1:40-2:00 | Live Monitoring screen | "Next - live monitoring. Imagine watching your device's voltage or current live, from your home, as if you were standing right in front of it. Kairos AI polls every parameter in real time. For this demo I stream a simulated feed into the same engine; in production, the device connects securely through an on-prem connector or a VPN." |
 
 ---
 
-## MINUTE 2 (1:00-2:00) - Login - Users & roles - Device - Integrations - Ask - Live
+## PART 2 — THE AGENTS, THE STACK, THE PROOF ~2:00-3:44
 
 | Time | SHOW ON SCREEN | SAY (word-for-word) |
 |---|---|---|
-| 1:00-1:10 | Sidebar showing "Store: firestore - Model: Vertex AI" and role | "Kairos AI is multi-tenant and secure. We sign in with role-based access - admin, engineer and viewer - so configuration, operations and read-only views are cleanly separated." |
-| 1:10-1:22 | **User Admin** page - add a user, pick a role | "From User Admin, an admin creates users and assigns roles. Engineers run analysis and approve actions; viewers only see results. For critical infrastructure, that separation of duties matters." |
-| 1:22-1:32 | **Device Manager** - show registered devices / Add a device | "In Device Manager we onboard any device - panelboards, meters, UPS, breakers - and each one gets its own private knowledge base." |
-| 1:32-1:44 | **Integrations** - point to GitHub repo, Confluence page, Saved knowledge links | "We feed it knowledge in Data Sources and Integrations - upload datasheets, or pull directly from GitHub and Confluence. Everything is embedded with Vertex AI into a per-device knowledge base the agents can cite." |
-| 1:44-1:54 | **Ask the device** - show Ask/Plan/Agent toggle; show the already-generated dataset | "Ask the device is our agentic assistant, with Ask, Plan and Agent modes. It clarifies before acting, then generates datasets, test cases, even code - all grounded in that device's documents." |
-| 1:54-2:00 | **Live Monitoring** - show the plan, click Start (readings stream) | "And Live Monitoring is self-configuring - the agent reads the datasheet to pick parameters and thresholds, decodes event logs, and streams live data into the very same engine." |
+| 2:00-2:30 | Agents diagram (5 agents) | "And the core of it all - Analysis, powered by five AI agents working as a team. Feed it data, and they go to work. Monitor flags anything abnormal. Diagnose explains the root cause, cited from the device's own manuals. Decide weighs the risk. Act auto-resolves what it can safely fix - and when it can't, it escalates: imagine an instant alert to the on-call engineer - 'voltage is dropping on the main incomer, repair needed now.' Then Verify confirms the fix actually worked. That one loop saves hours of downtime, cuts the effort, and saves real money." |
+| 2:30-2:47 | Live app montage: login -> device -> Ask -> Live Start -> Analysis Run | "Now let me show you - live, and deployed on Google Cloud. We sign in with role-based access, onboard a device, ask it questions, start live monitoring, and run an analysis on our demo panel." |
+| 2:47-3:05 | Google Cloud stack slide / sidebar backends | "Everything runs on Google Cloud. Gemini 2.5 Flash on Vertex AI is the brain - the reasoning and the diagnosis. Vertex AI embeddings ground every answer in the device's own documents. Firestore stores the platform, Cloud Storage the data, BigQuery the audit trail, and Secret Manager the keys - all deployed on Cloud Run." |
+| 3:05-3:28 | Analysis results; point to accuracy, downtime, cost | "And here's the analysis, complete. Across three assets, Kairos AI caught every fault - a voltage sag, an overload, and harmonic distortion - and explained each one: what went wrong, and why. It auto-resolved the reversible faults and escalated the rest. The result: two hundred twenty-three minutes of downtime avoided, and over a hundred and fifty thousand dollars saved. These numbers are illustrative - but the leverage is real: faults caught in seconds, with no one on site." |
+| 3:28-3:44 | Closing slide | "Power is the one thing our modern world simply can't live without. Kairos AI makes sure that when something goes wrong, the help is already inside the device - so hospitals stay open, water keeps flowing, and no one is left waiting in the dark. That's Kairos AI. Thank you." |
 
 ---
 
-## MINUTE 3 (2:00-3:00) - Analysis results - Future - Close
-
-| Time | SHOW ON SCREEN | SAY (word-for-word) |
-|---|---|---|
-| 2:00-2:14 | **Analysis** page - results now ready; scroll the dashboard | "Now back to our analysis - it's finished. Kairos AI processed the telemetry across three assets and caught every injected fault: a voltage sag, an overload, and rising harmonic distortion." |
-| 2:14-2:30 | Point to metrics: Diagnosis accuracy, Downtime avoided, Cost avoided | "It diagnosed each root cause with a hundred percent accuracy against ground truth, auto-resolved the reversible faults, escalated the rest, and quantified the impact - minutes of downtime and thousands of dollars avoided, every incident scored against a no-platform baseline." |
-| 2:30-2:44 | Open a case - show Monitor->Diagnose->Decide->Act->Verify trail + citation | "Every decision is fully traceable - the evidence, the cited manual passage, the human approval, and the verification - so engineers can trust it. And the same engine runs on both historical data and live streams." |
-| 2:44-3:00 | Closing slide (vision) | "This is just the beginning. Next: real sensor integration at the edge, full fleet modeling, predictive maintenance, and support for any industrial protocol. Kairos AI turns every device into its own reliability engineer - so the communities that depend on reliable power are never left in the dark. Thank you." |
-
----
+## Why this version is impactful
+- **Opens on a feeling everyone knows** (power going out) then raises the stakes to hospitals, water, factories - relatable + emotional.
+- **Names the villain** (you only get an alarm; experts can't be everywhere) before the hero.
+- **"Personal assistant that knows everything about the device"** frames Ask the device simply and memorably.
+- **Shows the agents as a team** with a concrete escalation ("voltage dropping, repair now").
+- **Closes on the human stakes**, not the tech - that wins Most Impactful and Social Choice.
 
 ## Delivery tips
-- **Energy and clarity beat speed.** If you run long, cut the least-important clause, not whole sections.
-- **Mouse = pointer.** Move deliberately to exactly what you mention; don't wander.
-- **Show, then speak** for the money moments (accuracy %, cost avoided) - let the number land.
-- End on the social-impact line; it's what wins "Most Impactful" and "Social Choice".
-- Keep total **under 3:00** (hard rule). Aim for ~2:50 to be safe.
+- Slow down on the hook (0:00-0:28) and the close - let them breathe. Speed up slightly through features.
+- Mouse = pointer; move to exactly what you name.
+- Show, THEN say the big numbers (100% diagnosis, 223 min, ~$150k).
+- Say "illustrative" once (it's in the line) - honesty scores with judges.
+- Keep total under 4:00; this lands ~3:44 at a natural pace.
