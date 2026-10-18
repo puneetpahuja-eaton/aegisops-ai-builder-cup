@@ -133,7 +133,10 @@ def _dataset_builder(device_id: str) -> None:
                     spec["duration_days"] = int(days)
                     spec["sample_interval_min"] = int(interval_min)
                     spec.setdefault("history_days", max(1, int(days) // 2 or 1))
-                    dataset = dataset_gen.build_dataset(dataset_gen.DatasetSpec.model_validate(spec))
+                    spec_obj = dataset_gen.DatasetSpec.model_validate(spec)
+                    # Guarantee a size-scaled mix of auto-resolved + escalated faults.
+                    spec_obj.anomalies = dataset_gen.ensure_anomaly_mix(spec_obj)
+                    dataset = dataset_gen.build_dataset(spec_obj)
                 except Exception as error:  # noqa: BLE001
                     st.error(f"Dataset generation failed: {error}")
                 else:

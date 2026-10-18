@@ -212,6 +212,63 @@ def _range_for(metrics: list[MetricSpec], role: str, default_min: float, default
     return default_min, default_max
 
 
+def ensure_anomaly_mix(spec: DatasetSpec) -> list[AnomalySpec]:
+    """Guarantee a size-scaled mix of auto-resolving and escalating faults.
+
+    Gemini-authored specs are inconsistent (often zero or only-recovering faults),
+    so for a predictable Analysis demo we synthesize a balanced anomaly set from the
+    spec's own assets/metrics:
+      * ~2/3 transient faults (recovers=True)  -> AUTO-RESOLVED
+      * ~1/3 sustained faults (recovers=False)  -> ESCALATED
+    The count scales with the replay length and asset count. Auto faults run early
+    (and clear), escalations run late (and persist), so they never overlap.
+    Distinct fault types per asset (sag / spike / dropout) keep the cases separate.
+    """
+    slots: list[list[tuple[str, str, str]]] = []
+    for asset in spec.assets:
+        volt = next((m.name for m in asset.metrics if _role_of(m.name) == "voltage"), None)
+        curr = next((m.name for m in asset.metrics
+                     if _role_of(m.name) == "current" and "neutral" not in m.name.lower()), None)
+        asset_slots: list[tuple[str, str, str]] = []
+        if volt:
+            asset_slots.append((asset.id, volt, "sag"))       # VOLTAGE_SAG
+        if curr:
+            asset_slots.append((asset.id, curr, "spike"))     # OVERLOAD
+        if curr:
+            asset_slots.append((asset.id, curr, "dropout"))   # BREAKER_TRIP
+        slots.append(asset_slots)
+    # Interleave across assets so different assets are used before reusing one.
+    ordered: list[tuple[str, str, str]] = []
+    for depth in range(max((len(s) for s in slots), default=0)):
+        for asset_slots in slots:
+            if depth < len(asset_slots):
+                ordered.append(asset_slots[depth])
+    if not ordered:
+        return list(spec.anomalies)  # no voltage/current metrics to perturb
+
+    per_day = max(1, (24 * 60) // spec.sample_interval_min)
+    replay_n = min(max(2, spec.duration_days * per_day), max(2, 10_000 // max(1, len(spec.assets))))
+    n_total = max(min(3, len(ordered)), min(round(replay_n / 24), len(ordered)))
+    n_escalate = max(1, n_total // 3) if n_total >= 2 else 0
+    n_auto = n_total - n_escalate
+    chosen = ordered[:n_total]
+
+    anomalies: list[AnomalySpec] = []
+    for i in range(n_auto):
+        asset_id, metric, kind = chosen[i]
+        frac = round(0.25 + 0.40 * (i / max(1, n_auto - 1)), 3) if n_auto > 1 else 0.4
+        anomalies.append(AnomalySpec(asset_id=asset_id, metric=metric, kind=kind,
+                                     start_fraction=min(0.65, frac), severity=0.8, recovers=True,
+                                     description=f"Transient {kind} on {metric} — auto-resolved."))
+    for j in range(n_escalate):
+        asset_id, metric, kind = chosen[n_auto + j]
+        frac = round(0.80 + 0.08 * (j / max(1, n_escalate - 1)), 3) if n_escalate > 1 else 0.82
+        anomalies.append(AnomalySpec(asset_id=asset_id, metric=metric, kind=kind,
+                                     start_fraction=min(0.9, frac), severity=0.9, recovers=False,
+                                     description=f"Sustained {kind} on {metric} — escalated to an engineer."))
+    return anomalies
+
+
 def build_dataset(spec: DatasetSpec) -> FleetDataset:
     interval = spec.sample_interval_min
     per_day = max(1, (24 * 60) // interval)
