@@ -17,3 +17,7 @@ submission/media/
 submission/Kairos-AI-Demo.mp4
 submission/node_modules/
 submission/~$*
+# Demo recordings are uploaded to a public host (YouTube/Drive) for submission,
+# not committed (they bloat history and can exceed GitHub's 100 MB file limit).
+submission/*.mp4
+submission/Media*.mp4
