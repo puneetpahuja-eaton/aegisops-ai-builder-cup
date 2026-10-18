@@ -1,4 +1,4 @@
-"""Earlier AegisOps workflow retained for regression and comparison."""
+"""Earlier Kairos AI workflow retained for regression and comparison."""
 from __future__ import annotations
 
 import json
@@ -15,7 +15,7 @@ from gemini_client import backend, is_live
 from models import Incident
 from orchestrator import approve_simulation, load_scenarios, load_sop, run_case
 
-st.set_page_config(page_title="AegisOps | Industrial reliability", page_icon="⚙️", layout="wide")
+st.set_page_config(page_title="Kairos AI | Industrial reliability", page_icon="⚙️", layout="wide")
 logging.basicConfig(level=logging.INFO)
 CLOUD_ERRORS = (GoogleAPICallError, GoogleAuthError, RuntimeError, ValueError, TimeoutError)
 
@@ -107,7 +107,7 @@ def render_case(case: dict) -> None:
 
 
 def main() -> None:
-    st.title("AegisOps")
+    st.title("Kairos AI")
     st.caption("Evidence -> grounded hypothesis -> human review -> sandbox action -> verification")
     st.warning("Hackathon sandbox: fictional SOPs; built-in telemetry is synthetic, uploads are chronological replay. No real equipment control or measured savings.")
     with st.sidebar:
@@ -161,7 +161,7 @@ def main() -> None:
         cols[3].metric("Human-approved simulations", sum(c["approval"]["approved"] for c in cases))
         for case in cases:
             render_case(case)
-        st.download_button("Download audit JSON", json.dumps(cases, indent=2), file_name="aegisops-audit.json", mime="application/json")
+        st.download_button("Download audit JSON", json.dumps(cases, indent=2), file_name="kairos-audit.json", mime="application/json")
         orders = [c["action"]["work_order"] for c in cases if c["action"]["type"] == "work_order"]
         st.download_button("Download work orders", json.dumps(orders, indent=2), file_name="work-orders.json", mime="application/json")
     else:

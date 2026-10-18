@@ -9,7 +9,7 @@ import devices
 import secretmgr
 from gemini_client import backend as model_backend
 
-PAGE_TITLE = "AegisOps — Multi-Device AI Reliability"
+PAGE_TITLE = "Kairos AI — Multi-Device AI Reliability"
 
 
 def configure() -> None:
@@ -33,7 +33,7 @@ def logout() -> None:
 
 def login_view() -> None:
     auth.ensure_seed_admin()
-    st.title("⚡ AegisOps")
+    st.title("⚡ Kairos AI")
     st.caption("Multi-device AI reliability platform · Google Cloud AI Builder Cup")
     with st.form("login"):
         email = st.text_input("Email")
@@ -50,8 +50,8 @@ def login_view() -> None:
     with st.expander("Demo access"):
         st.markdown(
             "On first run a demo admin is seeded. Default credentials (override with "
-            "`AEGIS_ADMIN_EMAIL` / `AEGIS_ADMIN_PASSWORD`):\n\n"
-            "- **admin@aegisops.demo** / **admin12345** (admin)\n\n"
+            "`KAIROS_ADMIN_EMAIL` / `KAIROS_ADMIN_PASSWORD`):\n\n"
+            "- **admin@kairos.ai** / **admin12345** (admin)\n\n"
             "Create engineer and viewer accounts from the **User Admin** page."
         )
 

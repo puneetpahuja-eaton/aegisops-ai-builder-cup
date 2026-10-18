@@ -21,7 +21,7 @@ def main() -> None:
     evidence = build_evidence(incident)
     diagnosis = diagnose(evidence, sop_text)
 
-    print("=== AegisOps — Grounded Industrial Reliability Co-pilot ===")
+    print("=== Kairos AI — Grounded Industrial Reliability Co-pilot ===")
     print(f"Gemini live: {is_live()}  (source: {diagnosis.get('_source')})\n")
     print("-- Evidence (deterministic) --")
     for s in evidence["signals"]:

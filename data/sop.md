@@ -1,4 +1,4 @@
-# AegisOps synthetic incident-triage playbook
+# Kairos AI synthetic incident-triage playbook
 
 This fictional playbook is for a hackathon sandbox, not an approved industrial
 operating procedure. It contains no equipment-control or servicing instructions.

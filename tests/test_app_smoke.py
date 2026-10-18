@@ -30,12 +30,12 @@ class AppShellTests(unittest.TestCase):
     def test_login_page_renders(self):
         app = AppTest.from_file(APP, default_timeout=60).run()
         self.assertEqual(len(app.exception), 0)
-        self.assertTrue(any("AegisOps" in h.value for h in app.title))
+        self.assertTrue(any("Kairos AI" in h.value for h in app.title))
 
     def test_admin_navigation_builds_all_sections(self):
         auth.ensure_seed_admin()
         app = AppTest.from_file(APP, default_timeout=60)
-        app.session_state["user"] = {"email": "admin@aegisops.demo", "role": "admin"}
+        app.session_state["user"] = {"email": "admin@kairos.ai", "role": "admin"}
         app.run()
         self.assertEqual(len(app.exception), 0)
 
@@ -48,7 +48,7 @@ class AppShellTests(unittest.TestCase):
     def test_home_lists_devices(self):
         devices.create_device(name="Smoke Device", type="METER")
         app = AppTest.from_file(APP, default_timeout=60)
-        app.session_state["user"] = {"email": "admin@aegisops.demo", "role": "admin"}
+        app.session_state["user"] = {"email": "admin@kairos.ai", "role": "admin"}
         app.run()
         self.assertEqual(len(app.exception), 0)
 

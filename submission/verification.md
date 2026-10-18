@@ -30,7 +30,7 @@ demo video for the new multi-device flow, and refresh the proposal deck.
   including the ten exact-PRISM parity/integration tests. The final full run
   completed in 198 seconds while browser checks were also running.
 - The default entrypoint now launches the original PRISM dashboard, not the
-  earlier redesigned AegisOps interface. All six original tabs, replay controls,
+  earlier redesigned Kairos AI interface. All six original tabs, replay controls,
   asset/scenario fields, case details and original five-agent engine are retained.
 - The canonical engine and synthetic inputs are byte-identical to the imported
   source manifest. Git attributes preserve the original bytes on Linux checkout.

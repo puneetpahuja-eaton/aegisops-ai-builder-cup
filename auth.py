@@ -98,13 +98,13 @@ def list_users() -> list[dict]:
 def ensure_seed_admin() -> dict | None:
     """Create the initial admin from env on first run so the app is usable.
 
-    Uses AEGIS_ADMIN_EMAIL / AEGIS_ADMIN_PASSWORD, defaulting to a clearly-labeled
+    Uses KAIROS_ADMIN_EMAIL / KAIROS_ADMIN_PASSWORD, defaulting to a clearly-labeled
     demo admin. Returns the created record, or None if any user already exists.
     """
     if datastore.count_docs(_USERS) > 0:
         return None
-    email = os.getenv("AEGIS_ADMIN_EMAIL", "admin@aegisops.demo")
-    password = os.getenv("AEGIS_ADMIN_PASSWORD", "admin12345")
+    email = os.getenv("KAIROS_ADMIN_EMAIL", "admin@kairos.ai")
+    password = os.getenv("KAIROS_ADMIN_PASSWORD", "admin12345")
     return create_user(email, password, "admin")
 
 

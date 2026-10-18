@@ -15,7 +15,7 @@ MEDIA = HERE / "media"
 
 def main():
     MEDIA.mkdir(exist_ok=True)
-    document = pymupdf.open(HERE / "AegisOps-Proposal.pdf")
+    document = pymupdf.open(HERE / "Kairos-AI-Proposal.pdf")
     for index in (0, 3, 5):
         document[index].get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5)).save(MEDIA / f"slide-{index + 1}.png")
     document.close()
@@ -63,7 +63,7 @@ def main():
     tempo = max(duration / 164, 1)
     if tempo > 2:
         raise ValueError("Narration is too long; shorten the script.")
-    output = HERE / "AegisOps-Demo-Draft.mp4"
+    output = HERE / "Kairos-AI-Demo.mp4"
     subprocess.run([
         ffmpeg, "-y", "-hide_banner", "-loglevel", "error", "-f", "concat", "-safe", "0",
         "-i", str(manifest), "-i", str(narration), "-af", f"atempo={tempo:.5f},apad",

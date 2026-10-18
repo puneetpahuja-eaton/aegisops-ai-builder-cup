@@ -1,4 +1,4 @@
-A plant alarm tells you what changed, not what to review next. Aegis Ops turns operational telemetry into a cited incident hypothesis and an engineer handoff. This is an edited screen sequence from the real deployed application. Network waiting time is omitted. All telemetry and procedures are synthetic. Nothing controls real equipment.
+A plant alarm tells you what changed, not what to review next. Kairos AI turns operational telemetry into a cited incident hypothesis and an engineer handoff. This is an edited screen sequence from the real deployed application. Network waiting time is omitted. All telemetry and procedures are synthetic. Nothing controls real equipment.
 
 The application runs on Google Cloud Run. Gemini on Vertex AI reasons over the incident evidence and procedure passages. Private Cloud Storage holds the documents and scenarios. BigQuery preserves the audit records. The deployed application uses a dedicated service account rather than an embedded API key.
 
@@ -10,4 +10,4 @@ The pump incident has a bearing risk code. The deterministic gate therefore requ
 
 The audit history records the model source, decision, human approval and verification. Operators can download the incident report and work orders. Model or storage failures are visible, and unavailable Google AI reasoning is never silently replaced by offline rules.
 
-Twenty two automated tests cover the workflow and dashboard. The live cloud smoke test accepted four diagnoses and persisted four audit records. These are small synthetic checks, not proof of production accuracy or savings. Our next step is an approved pilot measuring triage time, engineer acceptance and handoff completeness. Aegis Ops gives manufacturing teams evidence to action, with humans in control.
+Twenty two automated tests cover the workflow and dashboard. The live cloud smoke test accepted four diagnoses and persisted four audit records. These are small synthetic checks, not proof of production accuracy or savings. Our next step is an approved pilot measuring triage time, engineer acceptance and handoff completeness. Kairos AI gives manufacturing teams evidence to action, with humans in control.

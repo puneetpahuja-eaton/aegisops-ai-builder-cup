@@ -1,4 +1,4 @@
-# AegisOps — Multi-Device AI Reliability Platform (Google Cloud edition)
+# Kairos AI — Multi-Device AI Reliability Platform (Google Cloud edition)
 
 A role-based platform that onboards industrial devices, **learns from their
 documents and data (RAG)**, analyzes both fed and **live** telemetry with an
@@ -124,8 +124,8 @@ Streamlit 1.65+ is required (role-gated `st.navigation`, keyed tabs/expanders an
 the local store and offline reasoning — ideal for development and the test suite.
 Offline results are explicitly labeled, never presented as Google AI.
 
-**First run** seeds a demo admin (override with `AEGIS_ADMIN_EMAIL` /
-`AEGIS_ADMIN_PASSWORD`): `admin@aegisops.demo` / `admin12345`. Create engineer and
+**First run** seeds a demo admin (override with `KAIROS_ADMIN_EMAIL` /
+`KAIROS_ADMIN_PASSWORD`): `admin@kairos.ai` / `admin12345`. Create engineer and
 viewer accounts from **User Admin**.
 
 To enable Google Cloud, set in `.env`:
@@ -269,7 +269,7 @@ node .\verify-prism.mjs
 node .\verify-prism.mjs --live
 ```
 
-The local browser check expects the new app on port 8505; set `AEGIS_URL` to
+The local browser check expects the new app on port 8505; set `KAIROS_URL` to
 override. It exercises all original tabs, automatic synthetic remediation,
 case/audit downloads, full-field telemetry replacement, observation-only handling
 and invalid-upload preservation. The live check additionally uses actual Vertex AI,
@@ -279,7 +279,7 @@ Parity tests compare all 96 original fleet snapshots, event sequences, score
 histories, fitted model state, every case field/lifecycle, topology, baseline
 curves, value and all original named tools. Cloud tools are additive.
 
-The earlier AegisOps interface remains in `legacy_app.py` for regression/comparison,
+The earlier Kairos AI interface remains in `legacy_app.py` for regression/comparison,
 but is not the default dashboard. Its tests are retained.
 
 ## Deployment and costs

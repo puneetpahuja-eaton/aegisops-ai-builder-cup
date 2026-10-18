@@ -1,5 +1,5 @@
 {
-  "name": "aegisops-demo-capture",
+  "name": "kairos-ai-demo-capture",
   "private": true,
   "scripts": {
     "capture": "node capture-demo.mjs",

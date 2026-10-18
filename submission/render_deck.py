@@ -66,9 +66,9 @@ def slides():
 
 
 def main():
-    output = HERE / "AegisOps-Proposal.pdf"
+    output = HERE / "Kairos-AI-Proposal.pdf"
     pdf = canvas.Canvas(str(output), pagesize=(WIDTH, HEIGHT))
-    pdf.setTitle("AegisOps | Manufacturing AI Builder Cup")
+    pdf.setTitle("Kairos AI | Manufacturing AI Builder Cup")
     style = ParagraphStyle("body", fontName="Helvetica", fontSize=17, leading=24, textColor=WHITE, alignment=TA_LEFT)
     for index, (title, subtitle, bullets) in enumerate(slides(), 1):
         pdf.setFillColor(NAVY)
@@ -91,7 +91,7 @@ def main():
             y -= height + 14
         pdf.setFillColor(TEAL)
         pdf.setFont("Helvetica", 11)
-        pdf.drawString(40, 24, "AegisOps | Manufacturing | Synthetic demonstration")
+        pdf.drawString(40, 24, "Kairos AI | Manufacturing | Synthetic demonstration")
         pdf.drawRightString(WIDTH - 40, 24, f"{index} / 6")
         pdf.showPage()
     pdf.save()

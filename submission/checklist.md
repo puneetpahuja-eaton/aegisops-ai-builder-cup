@@ -15,9 +15,9 @@ Live URL: https://aegis-ops-498775210896.asia-south1.run.app
 
 Source: https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
 
-PDF: `AegisOps-Proposal.pdf`
+PDF: `Kairos-AI-Proposal.pdf`
 
-Video draft: `AegisOps-Demo-Draft.mp4` (local, not yet uploaded to an accepted host).
+Video draft: `Kairos-AI-Demo.mp4` (local, not yet uploaded to an accepted host).
 
 ## Participant tasks
 

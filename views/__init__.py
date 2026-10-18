@@ -1,1 +1,1 @@
-"""Streamlit page views for the AegisOps platform."""
+"""Streamlit page views for the Kairos AI platform."""

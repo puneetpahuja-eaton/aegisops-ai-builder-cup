@@ -1,4 +1,4 @@
-# AegisOps | Evidence to action, with humans in control
+# Kairos AI | Evidence to action, with humans in control
 
 ## 1. Problem: diagnosis is the bottleneck
 

@@ -1,4 +1,4 @@
-"""AegisOps — multi-device AI reliability platform (role-based, Google Cloud)."""
+"""Kairos AI — multi-device AI reliability platform (role-based, Google Cloud)."""
 from __future__ import annotations
 
 import streamlit as st
@@ -18,11 +18,11 @@ ui_common.configure()
 
 def home() -> None:
     user = ui_common.current_user()
-    st.title("⚡ AegisOps")
+    st.title("⚡ Kairos AI")
     st.caption("Multi-device AI reliability platform · Google Cloud AI Builder Cup")
     st.markdown(
         f"Signed in as **{user['email']}** (`{user['role']}`).\n\n"
-        "AegisOps onboards devices, learns from their documents and data (RAG), analyzes fed and "
+        "Kairos AI onboards devices, learns from their documents and data (RAG), analyzes fed and "
         "**live** telemetry with an agentic engine, and answers questions in a grounded chat."
     )
     all_devices = devices.list_devices()

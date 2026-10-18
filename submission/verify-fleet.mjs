@@ -9,7 +9,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const media = path.join(here, "media");
 await mkdir(media, { recursive: true });
 const live = process.argv.includes("--live");
-const url = process.env.AEGIS_URL || (live ? "https://aegis-ops-498775210896.asia-south1.run.app" : "http://localhost:8503");
+const url = process.env.KAIROS_URL || (live ? "https://aegis-ops-498775210896.asia-south1.run.app" : "http://localhost:8503");
 const executablePath = [
   path.join(process.env.LOCALAPPDATA, "Google", "Chrome", "Application", "chrome.exe"),
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
