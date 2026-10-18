@@ -43,6 +43,16 @@ def _save_link(device_id: str, link_id: str, kind: str, ref: str, result: dict) 
     })
 
 
+def _ensure_link_stub(device_id: str, link_id: str, kind: str, ref: str) -> None:
+    """Register the link immediately so it appears in the UI and survives an interrupted run."""
+    if datastore.get_doc(devices.links_path(device_id), link_id):
+        return
+    datastore.set_doc(devices.links_path(device_id), link_id, {
+        "id": link_id, "kind": kind, "ref": ref, "added_at": _now(),
+        "last_ingested": None, "chunk_count": 0, "status": "ingesting",
+    })
+
+
 def _sync_github(device_id: str, link_id: str, ref: str, branch: str | None,
                  existing: dict, on_progress, force: bool) -> dict:
     listing = github.repo_listing(ref, branch)
@@ -62,20 +72,28 @@ def _sync_github(device_id: str, link_id: str, ref: str, branch: str | None,
         return {**base, "files": 0, "chunks": existing.get("chunk_count", 0),
                 "added": 0, "updated": 0, "removed": 0, "unchanged": len(files), "skipped": True}
 
+    _ensure_link_stub(device_id, link_id, "github", ref)
     if force:
         ingest.delete_by_link(device_id, link_id)
 
     changed = [item for item in files if prev_shas.get(item["path"]) != item["sha"]]
+    # Resume support: files already stored with the same content SHA (from an earlier,
+    # possibly interrupted run) are kept and skipped, so a re-run only does the rest.
+    done_pairs = {(source.get("path"), source.get("blob_sha"))
+                  for source in ingest.sources_by_link(device_id, link_id)}
+    to_ingest = [item for item in changed if (item["path"], item["sha"]) not in done_pairs]
     removed_paths = set(prev_shas) - set(current_shas)
+    # Only delete sources for paths we are about to (re)ingest, plus files removed upstream.
     ingest.delete_sources_for_paths(device_id, link_id,
-                                    {item["path"] for item in changed} | removed_paths)
-    ingested, _ = github.ingest_items(device_id, listing["owner"], listing["repo"], changed,
-                                      link_id=link_id, on_progress=on_progress, total=len(changed))
-    total_chunks = sum(s.get("chunk_count", 0) for s in ingest.sources_by_link(device_id, link_id))
-    added = sum(1 for item in changed if item["path"] not in prev_shas)
-    return {**base, "files": ingested, "chunks": total_chunks,
-            "added": added, "updated": len(changed) - added, "removed": len(removed_paths),
-            "unchanged": len(files) - len(changed), "skipped": False}
+                                    {item["path"] for item in to_ingest} | removed_paths)
+    github.ingest_items(device_id, listing["owner"], listing["repo"], to_ingest,
+                        link_id=link_id, on_progress=on_progress, total=len(to_ingest))
+    stored = ingest.sources_by_link(device_id, link_id)
+    total_chunks = sum(source.get("chunk_count", 0) for source in stored)
+    added = sum(1 for item in to_ingest if item["path"] not in prev_shas)
+    return {**base, "files": len(stored), "chunks": total_chunks,
+            "added": added, "updated": len(to_ingest) - added, "removed": len(removed_paths),
+            "unchanged": len(files) - len(to_ingest), "skipped": False}
 
 
 def _sync_confluence(device_id: str, link_id: str, ref: str, existing: dict,

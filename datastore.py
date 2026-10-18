@@ -95,18 +95,39 @@ def set_doc(collection: str, doc_id: str, data: dict) -> None:
         _save_local(db)
 
 
+def _estimate_doc_bytes(data: dict) -> int:
+    """Rough serialized size of a document, dominated by chunk text + embedding."""
+    embedding = data.get("embedding")
+    embedding_bytes = len(embedding) * 10 if isinstance(embedding, list) else 0
+    text_bytes = len(data.get("text") or "")
+    return embedding_bytes + text_bytes + 512
+
+
+# Keep each Firestore commit well under the 10 MiB / 500-write limits. Embeddings
+# are large arrays (each element is also indexed), so cap by both count and size.
+_FS_MAX_OPS = 50
+_FS_MAX_BYTES = 900_000
+
+
 def set_docs(collection: str, items: dict[str, dict]) -> None:
-    """Write many documents in one batch (far fewer local-store rewrites / Firestore calls)."""
+    """Write many documents in size-bounded batches (fewer local rewrites / Firestore calls)."""
     if not items:
         return
     if is_firestore():
         client = _fs_client()
         collection_ref = _fs_collection(collection)
-        pending = list(items.items())
-        for start in range(0, len(pending), 450):  # Firestore batch limit is 500 ops.
-            batch = client.batch()
-            for doc_id, data in pending[start:start + 450]:
-                batch.set(collection_ref.document(doc_id), data)
+        batch = client.batch()
+        count = pending_bytes = 0
+        for doc_id, data in items.items():
+            size = _estimate_doc_bytes(data)
+            if count and (count >= _FS_MAX_OPS or pending_bytes + size > _FS_MAX_BYTES):
+                batch.commit()
+                batch = client.batch()
+                count = pending_bytes = 0
+            batch.set(collection_ref.document(doc_id), data)
+            count += 1
+            pending_bytes += size
+        if count:
             batch.commit()
         return
     with _LOCK:
