@@ -38,7 +38,7 @@ def extract_text(filename: str, data: bytes) -> str:
         return _extract_pdf(data)
     if name.endswith(".docx"):
         return _extract_docx(data)
-    if name.endswith(".xlsx"):
+    if name.endswith((".xlsx", ".xlsm", ".xltx", ".xltm")):
         return _extract_xlsx(data)
     if name.endswith(".csv"):
         return data.decode("utf-8-sig", errors="replace")

@@ -107,6 +107,33 @@ def parse_repo(repo_ref: str) -> tuple[str, str]:
     return parts[0], parts[1]
 
 
+def fetch_file_bytes(repo_ref: str, path: str, branch: str | None = None) -> bytes:
+    """Fetch a single file's raw bytes by repo path (supports binary files like .xlsm)."""
+    owner, repo = parse_repo(repo_ref)
+    branch = branch or _default_branch(owner, repo)
+    clean = path.strip().lstrip("/")
+    from urllib.parse import quote
+    url = f"{_API}/repos/{owner}/{repo}/contents/{quote(clean)}?ref={branch}"
+    response = requests.get(url, headers=_headers(), timeout=30)
+    if response.status_code == 404:
+        raise ValueError(f"File '{clean}' not found in {owner}/{repo}@{branch}. Check the exact path.")
+    response.raise_for_status()
+    payload = response.json()
+    if isinstance(payload, list):
+        raise ValueError(f"'{clean}' is a directory, not a file.")
+    if payload.get("content") and payload.get("encoding") == "base64":
+        return base64.b64decode(payload["content"])
+    # Large files (>1 MB) return no inline content; fetch via the blob API.
+    if payload.get("sha"):
+        blob_url = f"{_API}/repos/{owner}/{repo}/git/blobs/{payload['sha']}"
+        blob = requests.get(blob_url, headers=_headers(), timeout=30)
+        blob.raise_for_status()
+        body = blob.json()
+        if body.get("encoding") == "base64":
+            return base64.b64decode(body["content"])
+    raise ValueError(f"Could not read content of '{clean}'.")
+
+
 def repo_listing(repo_ref: str, branch: str | None = None) -> dict:
     """List matching files with their blob SHAs plus the repo's root tree SHA."""
     owner, repo = parse_repo(repo_ref)

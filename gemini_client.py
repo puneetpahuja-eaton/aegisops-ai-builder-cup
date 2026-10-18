@@ -44,7 +44,7 @@ def _client():
     from google.genai import types
 
     truststore.inject_into_ssl()
-    options = types.HttpOptions(timeout=30_000)
+    options = types.HttpOptions(timeout=int(os.getenv("GENAI_TIMEOUT_MS", "120000")))
     if os.getenv("USE_VERTEX") == "1":
         credentials = None
         # A short-lived token permits a local smoke test after gcloud auth login.
@@ -85,15 +85,15 @@ def generate_text(prompt: str, *, system_instruction: str | None = None, tempera
     if model.startswith("gemini-2.5-flash"):
         config["thinking_config"] = {"thinking_budget": 0}
     with _client() as client:
-        for attempt in range(2):
+        for attempt in range(4):
             try:
                 response = client.models.generate_content(model=model, contents=prompt, config=config)
                 if not response.text:
                     raise ModelUnavailable("Google AI returned no text (possibly blocked).")
                 return response.text
             except errors.APIError as error:
-                if error.code in (429, 500, 502, 503, 504) and attempt == 0:
-                    time.sleep(1)
+                if error.code in (429, 500, 502, 503, 504) and attempt < 3:
+                    time.sleep(2 * (attempt + 1))
                     continue
                 raise ModelUnavailable(f"Google AI request failed with HTTP {error.code}.") from error
     raise ModelUnavailable("Google AI request did not complete.")

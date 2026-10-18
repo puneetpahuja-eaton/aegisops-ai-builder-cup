@@ -141,3 +141,27 @@ def delete_link(device_id: str, link_id: str, *, purge: bool = True) -> None:
     if purge:
         ingest.delete_by_link(device_id, link_id)
     datastore.delete_doc(devices.links_path(device_id), link_id)
+
+
+def github_ref(device_id: str) -> str | None:
+    """Return the first saved GitHub repo ref for a device, if any."""
+    for link in list_links(device_id):
+        if link["kind"] == "github":
+            return link["ref"]
+    return None
+
+
+def fetch_repo_file_text(device_id: str, path: str, max_chars: int = 60000) -> dict:
+    """Fetch and parse a single file (by path) from the device's saved GitHub repo.
+
+    Supports text and Excel (.xlsm/.xlsx) files. Returns {name, text, repo}.
+    """
+    ref = github_ref(device_id)
+    if not ref:
+        raise ValueError("No GitHub repository is linked to this device. Add one in Integrations first.")
+    data = github.fetch_file_bytes(ref, path)
+    text = ingest.extract_text(path.rsplit("/", 1)[-1], data)
+    if not text.strip():
+        raise ValueError(f"'{path}' produced no readable text.")
+    return {"name": path, "text": text[:max_chars], "repo": ref,
+            "truncated": len(text) > max_chars}

@@ -8,7 +8,11 @@ from __future__ import annotations
 
 import streamlit as st
 
+import dataset_gen
+import device_data
+import devices
 import ingest
+import knowledge
 import rag
 import ui_common
 
@@ -69,6 +73,80 @@ def _run_assistant(device_id: str, prompt: str, history_key: str) -> None:
         "citations": result.get("citations", []), "artifacts": result.get("artifacts", [])})
 
 
+def _dataset_context(device_id: str) -> str:
+    chunks = rag.retrieve(device_id, "measured parameters metrics units ranges voltage current power energy", top_k=16)
+    return "\n\n".join(c.get("text", "")[:900] for c in chunks)
+
+
+def _dataset_builder(device_id: str) -> None:
+    is_admin = ui_common.current_role() == "admin"
+    with st.expander("🧰 Build a dataset for Analysis", expanded=False):
+        st.caption("Describe the dataset you want. Gemini can first ask clarifying questions, reference a "
+                   "specific repo file for exact parameter names/IDs, then generate a dataset you can load "
+                   "straight into the Analysis page (assets and metrics update to match).")
+        ref_key = f"ds_ref_{device_id}"
+        req_key = f"ds_req_{device_id}"
+        request = st.text_area("What dataset do you want?", key=req_key, height=90,
+                               placeholder="e.g. metering dataset with per-phase voltages, currents, active/"
+                                           "reactive/apparent power and energies for the last 3 days")
+        ref_path = st.text_input("Reference a repo file for parameters (optional path)", key=ref_key,
+                                 placeholder="source/Tools/RTK DCI DB Creator.xlsm",
+                                 help="Pulled from this device's linked GitHub repo and used as the "
+                                      "authoritative parameter list. Supports .xlsm/.xlsx/.csv/text.")
+        cols = st.columns(3)
+        if cols[0].button("❓ Ask clarifying questions", disabled=not request.strip(), key=f"ds_ask_{device_id}"):
+            with st.spinner("Loading reference and thinking..."):
+                try:
+                    reference = _load_reference(device_id, ref_path)
+                    questions = dataset_gen.clarifying_questions(_dataset_context(device_id), request, reference)
+                except Exception as error:  # noqa: BLE001
+                    st.error(str(error))
+                else:
+                    st.session_state[f"ds_questions_{device_id}"] = questions
+        if st.session_state.get(f"ds_questions_{device_id}"):
+            st.markdown("**Clarifying questions:**")
+            st.markdown(st.session_state[f"ds_questions_{device_id}"])
+            st.text_area("Your answers (optional)", key=f"ds_answers_{device_id}", height=80)
+        if cols[1].button("🧰 Generate dataset", type="primary", disabled=not request.strip(),
+                          key=f"ds_gen_{device_id}"):
+            with st.spinner("Loading reference, designing the dataset, and synthesizing..."):
+                try:
+                    reference = _load_reference(device_id, ref_path)
+                    spec = dataset_gen.generate_spec(_dataset_context(device_id), request, reference,
+                                                     st.session_state.get(f"ds_answers_{device_id}", ""))
+                    dataset = dataset_gen.build_dataset(dataset_gen.DatasetSpec.model_validate(spec))
+                except Exception as error:  # noqa: BLE001
+                    st.error(f"Dataset generation failed: {error}")
+                else:
+                    st.session_state[f"ds_dataset_{device_id}"] = dataset
+                    st.session_state[f"ds_spec_{device_id}"] = spec
+        dataset = st.session_state.get(f"ds_dataset_{device_id}")
+        if dataset is not None:
+            st.success(f"Generated: {len(dataset.assets)} asset(s), "
+                       f"{len(set(m for r in dataset.telemetry for m in r.metrics))} metric(s), "
+                       f"{len(dataset.history)} history + {len(dataset.telemetry)} replay rows.")
+            st.caption("Assets: " + ", ".join(a.id for a in dataset.assets)
+                       + " · Metrics: " + ", ".join(sorted({m for r in dataset.telemetry for m in r.metrics}))[:300])
+            st.download_button("⬇ Download dataset JSON", dataset.model_dump_json(indent=2),
+                               "analysis-dataset.json", "application/json", on_click="ignore",
+                               key=f"ds_dl_{device_id}")
+            if is_admin:
+                if st.button("➕ Load into Analysis", type="primary", key=f"ds_load_{device_id}"):
+                    device_data.set_dataset(device_id, dataset)
+                    st.session_state.pop("prism_device", None)  # Force Analysis to rebuild for this device.
+                    st.success("Loaded. Open the **Analysis** page — its assets and metrics now reflect this "
+                               "dataset. Press Play to run it.")
+            else:
+                st.info("Ask an admin to load this into Analysis, or download the JSON.")
+
+
+def _load_reference(device_id: str, ref_path: str) -> str:
+    if not ref_path.strip():
+        return ""
+    result = knowledge.fetch_repo_file_text(device_id, ref_path.strip())
+    return result["text"]
+
+
 def render() -> None:
     st.title("💬 Ask the device")
     st.caption("A capable assistant grounded in each device's ingested data (RAG). Ask questions, or ask it "
@@ -86,6 +164,8 @@ def render() -> None:
 
     if ingest.corpus_size(device_id) == 0:
         st.info("No knowledge ingested for this device yet. Add data in **Data Sources**.")
+
+    _dataset_builder(device_id)
 
     st.caption("Quick actions:")
     action_cols = st.columns(len(_QUICK_ACTIONS))

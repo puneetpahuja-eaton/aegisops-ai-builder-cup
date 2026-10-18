@@ -624,5 +624,51 @@ class KnowledgePersistenceTests(PlatformTestBase):
         self.assertLess(ingest.corpus_size(device["id"]), corpus_before)
 
 
+class DatasetGenTests(PlatformTestBase):
+    def test_build_dataset_from_spec_is_valid_and_has_anomaly(self):
+        import dataset_gen
+        spec = dataset_gen.DatasetSpec.model_validate({
+            "assets": [{"id": "METER-1", "type": "METER", "criticality": "high",
+                        "metrics": [{"name": "voltage_a_v", "unit": "V", "normal_min": 220, "normal_max": 240},
+                                    {"name": "current_a_a", "unit": "A", "normal_min": 0, "normal_max": 100}]}],
+            "sample_interval_min": 5, "duration_days": 1, "history_days": 1,
+            "anomalies": [{"asset_id": "METER-1", "metric": "voltage_a_v", "start_fraction": 0.5,
+                           "kind": "sag", "severity": 0.8, "description": "voltage sag"}]})
+        dataset = dataset_gen.build_dataset(spec)
+        self.assertEqual(len(dataset.assets), 1)
+        self.assertGreaterEqual(len(dataset.history), 20)
+        self.assertTrue(dataset.telemetry)
+        # History is all healthy; replay contains the injected anomaly code.
+        self.assertTrue(all(code == "OK" for r in dataset.history for code in r.event_codes))
+        self.assertTrue(any("VOLT_SAG" in r.event_codes for r in dataset.telemetry))
+        metrics = {m for r in dataset.telemetry for m in r.metrics}
+        self.assertEqual(metrics, {"voltage_a_v", "current_a_a"})
+
+    def test_build_dataset_respects_row_limits(self):
+        import dataset_gen
+        spec = dataset_gen.DatasetSpec.model_validate({
+            "assets": [{"id": f"A{i}", "metrics": [{"name": "v", "normal_min": 0, "normal_max": 1}]}
+                       for i in range(5)],
+            "duration_days": 14, "history_days": 14, "sample_interval_min": 1})
+        dataset = dataset_gen.build_dataset(spec)
+        self.assertLessEqual(len(dataset.history), 20_000)
+        self.assertLessEqual(len(dataset.telemetry), 10_000)
+
+
+class IngestionExtraTests(PlatformTestBase):
+    def test_extract_text_routes_xlsm_like_xlsx(self):
+        import openpyxl
+        import io
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["Parameter", "ID", "Unit"])
+        ws.append(["Voltage A", 22120, "V"])
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        text = ingest.extract_text("RTK DCI DB Creator.xlsm", buffer.getvalue())
+        self.assertIn("Voltage A", text)
+        self.assertIn("22120", text)
+
+
 if __name__ == "__main__":
     unittest.main()
