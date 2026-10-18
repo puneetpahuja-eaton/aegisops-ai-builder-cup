@@ -74,7 +74,8 @@ def _run_assistant(device_id: str, prompt: str, history_key: str, mode: str) -> 
             st.caption("Sources: " + ", ".join(result["citations"]))
     st.session_state[history_key].append({
         "role": "assistant", "content": result["answer"],
-        "citations": result.get("citations", []), "artifacts": result.get("artifacts", [])})
+        "citations": result.get("citations", []), "artifacts": result.get("artifacts", []),
+        "needs_clarification": result.get("needs_clarification", False)})
 
 
 def _dataset_context(device_id: str) -> str:

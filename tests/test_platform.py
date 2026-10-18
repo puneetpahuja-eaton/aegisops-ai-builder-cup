@@ -185,6 +185,23 @@ class RagTests(PlatformTestBase):
         self.assertEqual(len(result["artifacts"]), 1)
         self.assertEqual(result["artifacts"][0]["lang"], "csv")
 
+    def test_converse_does_not_reask_after_user_defers(self):
+        device = devices.create_device(name="Meter", type="METER")
+        ingest.ingest_text(device["id"], name="doc", kind="document", text="voltage info " * 40)
+        history = [
+            {"role": "user", "content": "make a dataset"},
+            {"role": "assistant", "content": "Which phase?", "needs_clarification": True},
+            {"role": "user", "content": "you decide"},
+        ]
+        # Even if the model tries to clarify again, the anti-loop safety net forces proceeding.
+        fake = {"needs_clarification": True, "clarifying_questions": ["Which phase again?"],
+                "awaiting_confirmation": False,
+                "answer": "Here is the dataset.\n```csv\nts,v,i\n1,230,5\n2,231,5\n3,229,5\n4,230,5\n```"}
+        with patch("rag.is_live", return_value=True), patch("rag.generate_json", return_value=fake):
+            result = rag.converse(device["id"], "you decide", mode="agent", history=history)
+        self.assertFalse(result["needs_clarification"])
+        self.assertEqual(len(result["artifacts"]), 1)
+
     def test_extract_artifacts_from_fenced_blocks(self):
         text = ("Here is your dataset.\n```csv\ntimestamp,voltage,current\n2026-01-01,230,5\n"
                 "2026-01-02,231,5.1\n```\nAnd a test file:\n```json\n{\"cases\": [1, 2, 3, 4, 5]}\n```")
