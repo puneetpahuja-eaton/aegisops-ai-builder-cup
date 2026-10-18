@@ -176,7 +176,9 @@ text(s, 0.95, 4.25, 10.5, 1.0,
 chip(s, 0.95, 5.4, 3.3, 0.5, "Theme · Manufacturing", fill=PANEL, size=12)
 chip(s, 4.4, 5.4, 3.5, 0.5, "Gemini 2.5 Flash · Vertex AI", fill=PANEL, size=12)
 chip(s, 8.1, 5.4, 3.2, 0.5, "Deployed on Cloud Run", fill=PANEL, size=12)
-text(s, 0.95, 6.35, 11.5, 0.5,
+text(s, 0.95, 6.1, 11.5, 0.35,
+     [("Team:  ", 12, True, TEAL, 0), ("Puneet Pahuja (Team Lead)  ·  Khushboo Verma  ·  Anurag Verma", 12, False, WHITE)])
+text(s, 0.95, 6.5, 11.5, 0.5,
      [("Live: kairos-ai-498775210896.asia-south1.run.app     ·     github.com/puneetpahuja-eaton/kairos-ai",
        11, False, MUTE)])
 
@@ -386,12 +388,14 @@ for i, (h, b, acc) in enumerate([
         ("Honest by design", "Offline fallbacks labeled; demo data synthetic; humans approve actions.", AMBER)]):
     t = 1.95 + i * 0.6
     text(s, 0.95, t, 11.3, 0.55, [(f"✓  {h}  ", 13.5, True, acc, 0), ("— " + b, 12, False, MUTE)])
-text(s, 0.9, 4.55, 11.4, 1.3, [("Start with one device.", 38, True, WHITE), ("Scale to the world.", 38, True, TEAL)])
-text(s, 0.95, 6.15, 11.3, 0.5,
-     [("Live · kairos-ai-498775210896.asia-south1.run.app      ·      github.com/puneetpahuja-eaton/kairos-ai",
-       11.5, False, MUTE)])
-text(s, 0.95, 6.6, 11.3, 0.4, [("121 automated tests · deployed & verified on Cloud Run · Firestore-backed · Gemini on Vertex AI",
-                                10.5, True, TEAL)])
+text(s, 0.9, 4.5, 11.4, 1.3, [("Start with one device.", 38, True, WHITE), ("Scale to the world.", 38, True, TEAL)])
+text(s, 0.95, 6.05, 11.3, 0.35,
+     [("Team:  ", 11.5, True, TEAL, 0), ("Puneet Pahuja (Team Lead)  ·  Khushboo Verma  ·  Anurag Verma", 11.5, False, WHITE)])
+text(s, 0.95, 6.42, 11.3, 0.4,
+     [("Live · kairos-ai-498775210896.asia-south1.run.app   ·   github.com/puneetpahuja-eaton/kairos-ai",
+       10.5, False, MUTE)])
+text(s, 0.95, 6.78, 11.3, 0.35, [("121 automated tests · deployed & verified on Cloud Run · Gemini on Vertex AI",
+                                  10, True, TEAL)])
 
 out = HERE / "Kairos-AI-Pitch-Deck.pptx"
 prs.save(str(out))
