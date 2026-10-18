@@ -59,6 +59,9 @@ class FleetDataset(Contract):
     assets: list[FleetAsset] = Field(min_length=1, max_length=50)
     history: list[Reading] = Field(min_length=20, max_length=20_000)
     telemetry: list[Reading] = Field(min_length=1, max_length=10_000)
+    # Ground-truth labels for a GENERATED synthetic dataset (known injected faults).
+    # Empty for real uploaded field data, which stays observation-only.
+    scenarios: list[dict] = Field(default_factory=list, max_length=20)
 
     @model_validator(mode="after")
     def validate_fleet(self):

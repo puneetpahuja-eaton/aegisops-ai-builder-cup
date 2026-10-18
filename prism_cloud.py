@@ -129,6 +129,7 @@ class Engine(ReferenceEngine):
         self.offline = not is_live() if offline is None else offline
         self.source = "uploaded" if dataset is not None else "synthetic"
         self.dataset = dataset.model_copy(deep=True) if dataset is not None else None
+        self.labeled = True  # synthetic or ground-truth-generated data can score accuracy/value
         self.on_event = None
         self.sop = storage.load_text("sop.md")
         if self.dataset is None:
@@ -150,7 +151,11 @@ class Engine(ReferenceEngine):
                     assets[asset.parent_id].children.append(asset.asset_id)
             self.topo = Topology(assets)
             self.signal = ReplaySource(self.dataset)
-            self._scenarios = []
+            # Ground-truth scenarios make a GENERATED dataset labeled (accuracy + value);
+            # real uploaded field data has none and stays observation-only.
+            self._scenarios = [s for s in (self.dataset.scenarios or [])
+                               if s.get("asset_id") in self.topo.assets and s.get("fault_type") in config.PLAYBOOK]
+            self.labeled = bool(self._scenarios)
             self.total_samples = len(self.signal.frames)
         self.metric_model = MetricAnomalyModel()
         self.code_model = CodePatternModel()
@@ -252,8 +257,8 @@ class Engine(ReferenceEngine):
         self.on_event = on_event
         try:
             super().tick()
-            if self.source == "uploaded":
-                # There is no measured intervention/counterfactual for uploaded observations.
+            if self.source == "uploaded" and not self.labeled:
+                # Real uploaded field data has no measured intervention/counterfactual.
                 for case in self.cases:
                     case.downtime_avoided_min = 0
                     case.cost_avoided_usd = 0
@@ -262,7 +267,7 @@ class Engine(ReferenceEngine):
 
     def summary(self) -> dict:
         result = super().summary()
-        if self.source == "uploaded":
+        if self.source == "uploaded" and not self.labeled:
             result["diagnosis_accuracy"] = None
         elif not any(case.ground_truth_root for case in self.cases):
             result["diagnosis_accuracy"] = None

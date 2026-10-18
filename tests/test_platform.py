@@ -719,6 +719,77 @@ class DatasetGenTests(PlatformTestBase):
             self.assertAlmostEqual(pf, p / s if s else 0, delta=0.03)
             self.assertAlmostEqual(s, math.sqrt(p * p + q * q), delta=max(5.0, 0.02 * s))
 
+class MonitorGenTests(PlatformTestBase):
+    def test_plan_to_config_maps_params_and_event_log(self):
+        import monitor_gen
+        plan = {"poll_interval_s": 300, "hex_as_float": True,
+                "params": [{"pid": "22120", "label": "Phase A V", "lower": 210, "upper": 250, "unit": "V"},
+                           {"pid": "22121", "label": "Phase B V", "path": "data.v"}],
+                "event_log": {"pid": "40010", "format": "ring buffer", "decode": "words", "code_field": "w2"}}
+        cfg = monitor_gen.plan_to_config(plan, "https://x/rs/param/22120/value")
+        self.assertEqual(cfg["interval"], 300)
+        self.assertEqual(cfg["param_ids"], ["22120", "22121"])
+        self.assertEqual(cfg["monitored"][0]["lower"], 210)
+        self.assertEqual(cfg["monitored"][1]["path"], "data.v")
+        self.assertEqual(cfg["event_log"]["pid"], "40010")
+
+    def test_generate_plan_parses_text_json(self):
+        import monitor_gen
+        text = ('```json\n{"poll_interval_s": 60, "hex_as_float": true, '
+                '"params": [{"pid": "700", "label": "Va", "unit": "V", "lower": 210, "upper": 250}], '
+                '"event_log": null, "notes": "ok"}\n```')
+        with patch("monitor_gen.is_live", return_value=True), \
+             patch("monitor_gen.rag.retrieve", return_value=[]), \
+             patch("monitor_gen.generate_text", return_value=text):
+            plan = monitor_gen.generate_plan("dev", "monitor Va every minute")
+        self.assertEqual(plan["poll_interval_s"], 60)
+        self.assertEqual(plan["params"][0]["pid"], "700")
+        self.assertIsNone(plan["event_log"])
+
+
+class MetricsFixTests(PlatformTestBase):
+    def test_generated_dataset_scores_accuracy_and_value(self):
+        import dataset_gen
+        from prism_cloud import Engine
+        names = [("voltage_a_rms", "V", 228, 232), ("voltage_b_rms", "V", 228, 232),
+                 ("voltage_c_rms", "V", 228, 232), ("current_a_rms", "A", 10, 90),
+                 ("current_b_rms", "A", 10, 90), ("current_c_rms", "A", 10, 90),
+                 ("active_power_total", "W", 0, 60000), ("apparent_power_total", "VA", 0, 65000),
+                 ("power_factor_total", "", 0.88, 0.96), ("active_energy_total_kwh", "kWh", 0, 1e9)]
+        spec = dataset_gen.DatasetSpec.model_validate({
+            "assets": [{"id": "METER-1", "type": "METER", "criticality": "high",
+                        "metrics": [{"name": n, "unit": u, "normal_min": lo, "normal_max": hi}
+                                    for n, u, lo, hi in names]}],
+            "sample_interval_min": 5, "duration_days": 1, "history_days": 1,
+            "anomalies": [{"asset_id": "METER-1", "metric": "voltage_a_rms", "start_fraction": 0.3,
+                           "kind": "sag", "severity": 0.8}]})
+        dataset = dataset_gen.build_dataset(spec)
+        self.assertTrue(dataset.scenarios)  # ground truth attached
+        engine = Engine(offline=True, dataset=dataset)
+        self.assertTrue(engine.labeled)
+        engine.run_all()
+        summary = engine.summary()
+        # A labeled generated dataset scores accuracy and credits early-detection value.
+        self.assertIsNotNone(summary["diagnosis_accuracy"])
+        self.assertGreater(summary["cost_avoided_usd"], 0)
+        self.assertTrue(any(c.ground_truth_root for c in engine.cases))
+
+    def test_unlabeled_upload_stays_observation_only(self):
+        from prism_cloud import Engine
+        from fleet_data import FleetAsset, FleetDataset, Reading
+        import datetime
+        base = datetime.datetime(2026, 1, 1, tzinfo=datetime.timezone.utc)
+        assets = [FleetAsset(id="A1", type="METER", criticality="high")]
+        history = [Reading(timestamp=base + datetime.timedelta(minutes=5 * i), asset_id="A1",
+                           metrics={"voltage_v": 230.0, "current_a": 10.0}, event_codes=["OK"]) for i in range(25)]
+        telemetry = [Reading(timestamp=base + datetime.timedelta(minutes=5 * (25 + i)), asset_id="A1",
+                             metrics={"voltage_v": 230.0, "current_a": 10.0}, event_codes=["OK"]) for i in range(5)]
+        dataset = FleetDataset(source="uploaded", assets=assets, history=history, telemetry=telemetry)
+        engine = Engine(offline=True, dataset=dataset)
+        self.assertFalse(engine.labeled)  # no scenarios -> observation-only
+        engine.run_all()
+        self.assertIsNone(engine.summary()["diagnosis_accuracy"])
+
     def test_build_dataset_respects_row_limits(self):
         import dataset_gen
         spec = dataset_gen.DatasetSpec.model_validate({

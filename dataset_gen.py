@@ -25,6 +25,9 @@ from fleet_data import FleetAsset, FleetDataset, Reading
 from gemini_client import generate_text, is_live
 
 _ANOMALY_CODE = {"spike": "OVERLOAD_ALARM", "sag": "VOLT_SAG", "drift": "THD_HIGH", "dropout": "LOAD_LOST"}
+# Map an anomaly kind to the PRISM ground-truth fault type (for accuracy scoring).
+_ANOMALY_FAULT = {"spike": "OVERLOAD", "sag": "VOLTAGE_SAG", "drift": "HARMONIC_DISTORTION",
+                  "dropout": "BREAKER_TRIP"}
 
 
 class MetricSpec(BaseModel):
@@ -337,4 +340,15 @@ def build_dataset(spec: DatasetSpec) -> FleetDataset:
             history.append(emit(index, "history"))
         for index in range(replay_n):
             telemetry.append(emit(history_n + index, "replay"))
-    return FleetDataset(source="uploaded", assets=assets, history=history, telemetry=telemetry)
+
+    # Ground-truth scenarios from the injected anomalies (enables accuracy + value).
+    scenarios: list[dict] = []
+    for i, anomaly in enumerate(spec.anomalies):
+        fault_type = _ANOMALY_FAULT.get(anomaly.kind, "VOLTAGE_SAG")
+        scenarios.append({
+            "scenario_id": f"S{i + 1}", "asset_id": anomaly.asset_id, "fault_type": fault_type,
+            "start_sample": int(anomaly.start_fraction * replay_n),
+            "description": anomaly.description or f"Injected {anomaly.kind} on {anomaly.metric}",
+            "ground_truth_root_cause": anomaly.asset_id})
+    return FleetDataset(source="uploaded", assets=assets, history=history, telemetry=telemetry,
+                        scenarios=scenarios)

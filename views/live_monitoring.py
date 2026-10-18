@@ -6,12 +6,85 @@ import streamlit as st
 
 import datastore
 import devices
+import monitor_gen
 import rag
 import secretmgr
 import ui_common
 from live import rest_adapter, sim_feed
 from live.inference import suggest_field_map
 from live.monitor import LiveMonitor
+
+
+def _plan_builder(device: dict) -> None:
+    """Chat-style generator that turns an instruction into a monitoring config."""
+    device_id = device["id"]
+    with st.expander("🧰 Build monitoring from an instruction (agent)"):
+        st.caption("Describe what to monitor in plain language. The agent reads this device's docs to "
+                   "resolve parameter IDs, polling interval, thresholds and the event-log decode. It asks "
+                   "clarifying questions first — especially about how the event log is structured.")
+        request = st.text_area("What should I monitor?", key=f"mp_req_{device_id}", height=90,
+                               placeholder="Monitor per-phase voltages and currents every 5 minutes, and "
+                                           "read the fault/event log; alarm if voltage leaves 210-250 V.")
+        ref_path = st.text_input("Reference a repo file for parameters (optional path)",
+                                 key=f"mp_ref_{device_id}",
+                                 placeholder="source/Tools/Database/DCI Descriptors.json")
+        cols = st.columns(3)
+        if cols[0].button("❓ Ask clarifying questions", key=f"mp_ask_{device_id}", disabled=not request.strip()):
+            with st.spinner("Reading docs and thinking..."):
+                try:
+                    reference = _plan_reference(device_id, ref_path)
+                    st.session_state[f"mp_q_{device_id}"] = monitor_gen.clarifying_questions(
+                        device_id, request, reference)
+                except Exception as error:  # noqa: BLE001
+                    st.error(str(error))
+        if st.session_state.get(f"mp_q_{device_id}"):
+            st.markdown("**Clarifying questions:**")
+            st.markdown(st.session_state[f"mp_q_{device_id}"])
+            st.text_area("Your answers (optional)", key=f"mp_ans_{device_id}", height=80)
+        if cols[1].button("🧰 Generate plan", type="primary", key=f"mp_gen_{device_id}",
+                          disabled=not request.strip()):
+            with st.spinner("Resolving parameters and building the plan..."):
+                try:
+                    reference = _plan_reference(device_id, ref_path)
+                    plan = monitor_gen.generate_plan(device_id, request, reference,
+                                                     st.session_state.get(f"mp_ans_{device_id}", ""))
+                except Exception as error:  # noqa: BLE001
+                    st.error(f"Plan generation failed: {error}")
+                else:
+                    st.session_state[f"mp_plan_{device_id}"] = plan
+        plan = st.session_state.get(f"mp_plan_{device_id}")
+        if plan:
+            st.success(f"Plan: {len(plan.get('params', []))} parameter(s), "
+                       f"interval {plan.get('poll_interval_s')}s"
+                       + (", event log decode included" if plan.get("event_log") else ""))
+            st.dataframe([{"pid": p["pid"], "label": p.get("label", ""), "lower": p.get("lower"),
+                           "upper": p.get("upper"), "unit": p.get("unit", "")}
+                          for p in plan.get("params", [])], hide_index=True, width="stretch")
+            if plan.get("event_log"):
+                st.markdown("**Event log decode:**")
+                st.json(plan["event_log"])
+            if plan.get("notes"):
+                st.caption(plan["notes"])
+            current = _load_config(device_id)
+            default_ep = current.get("endpoint") or "https://10.130.178.92/rs/param/22120/value"
+            endpoint = st.text_input("Base REST endpoint for these params", value=default_ep,
+                                     key=f"mp_ep_{device_id}")
+            if st.button("➕ Apply to Live Monitoring", key=f"mp_apply_{device_id}"):
+                cfg = _load_config(device_id)
+                cfg.update(monitor_gen.plan_to_config(plan, endpoint))
+                cfg["simulated"] = False
+                _save_config(device_id, cfg)
+                st.success("Applied. The parameters, interval and event-log decode are now set below. "
+                           "Add auth/TLS, Save connection, and Start.")
+                st.rerun()
+
+
+def _plan_reference(device_id: str, ref_path: str) -> str:
+    if not ref_path.strip():
+        return ""
+    import knowledge
+    return knowledge.fetch_repo_file_text(device_id, ref_path.strip())["text"]
+
 
 
 def _config_key(device_id: str) -> str:
@@ -220,6 +293,8 @@ def render() -> None:
     if not device:
         return
     device_id = device["id"]
+
+    _plan_builder(device)
 
     with st.expander("⚙️ Configure connection", expanded=not _load_config(device_id)):
         config = _render_config(device)
