@@ -7,7 +7,7 @@ Cloud: Gemini on Vertex AI, Vertex AI embeddings, Firestore, Cloud Storage,
 BigQuery, Secret Manager and Cloud Run.
 
 - Live application: https://kairos-ai-498775210896.asia-south1.run.app
-- Source: https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
+- Source: https://github.com/puneetpahuja-eaton/kairos-ai
 
 ## Scope and provenance
 

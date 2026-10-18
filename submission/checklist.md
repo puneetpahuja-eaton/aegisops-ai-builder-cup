@@ -13,7 +13,7 @@
 
 Live URL: https://kairos-ai-498775210896.asia-south1.run.app
 
-Source: https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
+Source: https://github.com/puneetpahuja-eaton/kairos-ai
 
 PDF: `Kairos-AI-Proposal.pdf`
 

@@ -153,7 +153,7 @@ eliminate model availability errors. Retrying a failed incident is supported.
 ## Publication and remaining ownership tasks
 
 The standalone public GitHub source is:
-https://github.com/puneetpahuja-eaton/aegisops-ai-builder-cup
+https://github.com/puneetpahuja-eaton/kairos-ai
 
 The proposed deck and demo assets require participant review.
 The final video must be uploaded to an organizer-accepted host.
